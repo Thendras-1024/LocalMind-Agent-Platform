@@ -1,0 +1,18 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <groupId>org.javaup</groupId>
+    <artifactId>localmind-agent-platform</artifactId>
+    <version>${revision}</version>
+  </parent>
+  <artifactId>localmind-redis-tool-framework</artifactId>
+  <name>localmind-redis-tool-framework</name>
+  <description>redis宸ュ叿缁勪欢</description>
+  <packaging>pom</packaging>
+  <modules>
+    <module>localmind-redis-common-framework</module>
+    <module>localmind-redis-framework</module>
+    <module>localmind-redis-rate-limit-framework</module>
+  </modules>
+</project>

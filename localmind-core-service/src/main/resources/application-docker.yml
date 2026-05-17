@@ -1,0 +1,13 @@
+spring:
+  datasource:
+    url: jdbc:shardingsphere:classpath:shardingsphere-docker.yaml
+  data:
+    redis:
+      host: redis
+      port: 6379
+      password: yaochen123
+  kafka:
+    bootstrap-servers: kafka:9092
+
+localmind:
+  image-upload-dir: /app/shared-imgs/

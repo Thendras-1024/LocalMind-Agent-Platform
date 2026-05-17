@@ -1,0 +1,13 @@
+package org.javaup.utils;
+
+/**
+ * @program: 智邻生活 Agent 平台
+ * @description: 系统常量-黑马点评普通版本和plus版本使用
+ * @author: 阿星不是程序员
+ **/
+public class SystemConstants {
+    public static final String IMAGE_UPLOAD_DIR = "D:\\lesson\\nginx-1.18.0\\html\\hmdp\\imgs\\";
+    public static final String USER_NICK_NAME_PREFIX = "user_";
+    public static final int DEFAULT_PAGE_SIZE = 5;
+    public static final int MAX_PAGE_SIZE = 10;
+}
