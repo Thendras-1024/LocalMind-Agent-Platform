@@ -262,10 +262,6 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
      */
     @Override
     public Result queryShopByType(Integer typeId, Integer current, Double x, Double y) {
-        // 临时修改：忽略传入的坐标参数，强制走数据库查询
-        x = null;
-        y = null;
-
         // ===== 无坐标模式：直接查数据库分页 =====
         if (x == null || y == null) {
             // 按类型分页查询数据库

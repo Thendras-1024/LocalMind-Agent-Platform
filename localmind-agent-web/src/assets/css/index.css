@@ -117,3 +117,39 @@
     height: 75%;
     margin-right: 2px;
 }
+
+.recommend-agent-entry {
+    position: fixed;
+    right: 14px;
+    bottom: 76px;
+    z-index: 300;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    height: 44px;
+    padding: 6px 10px 6px 6px;
+    border: none;
+    border-radius: 22px;
+    color: #fff;
+    background: #ff6633;
+    box-shadow: 0 6px 16px rgba(255, 102, 51, 0.35);
+    cursor: pointer;
+}
+
+.agent-face {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    color: #ff6633;
+    background: #fff;
+    font-size: 19px;
+}
+
+.agent-label {
+    font-size: 13px;
+    line-height: 1;
+    white-space: nowrap;
+}

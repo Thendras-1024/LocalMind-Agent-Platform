@@ -23,6 +23,11 @@ const router = createRouter({
       component: () => import('@/views/index.vue')
     },
     {
+      path: '/recommendAgent',
+      name: 'RecommendAgent',
+      component: () => import('@/views/agent/RecommendAgent.vue')
+    },
+    {
       path: '/shopList',
       component: () => import('@/views/shop/ShopList.vue')
     },

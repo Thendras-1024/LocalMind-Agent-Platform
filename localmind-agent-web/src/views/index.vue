@@ -8,7 +8,7 @@ import {
 import { ref } from 'vue'
 import router from '@/router'
 import FootBar from '@/components/FootBar.vue'
-import { User } from '@element-plus/icons-vue'
+import { ChatDotRound, User } from '@element-plus/icons-vue'
 import { resolveAssetPath } from '@/utils/asset'
 const isReachBottom = ref(false)
 const types = ref([])
@@ -95,6 +95,9 @@ const toBlogDetail = (b) => {
 const toInfo = () => {
   router.push('/InfoHtml')
 }
+const toRecommendAgent = () => {
+  router.push('/recommendAgent')
+}
 </script>
 
 <template>
@@ -157,6 +160,12 @@ const toInfo = () => {
       </div>
     </div>
   </div>
+  <button class="recommend-agent-entry" @click="toRecommendAgent" aria-label="打开智能推荐导购">
+    <span class="agent-face">
+      <el-icon><ChatDotRound /></el-icon>
+    </span>
+    <span class="agent-label">推荐小精灵</span>
+  </button>
   <FootBar :active-btn="1"></FootBar>
 </template>
 
