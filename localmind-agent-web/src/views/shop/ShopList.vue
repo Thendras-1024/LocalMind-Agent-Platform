@@ -86,7 +86,7 @@
 import { ref, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ArrowLeft, ArrowDown, Search, Location } from '@element-plus/icons-vue'
-import { getShopList, getShopTypeList } from '@/api/shop'
+import { getShopList, getShopTypeList, getShopLocationConfig } from '@/api/shop'
 import { throttle } from '@/utils/scroll'
 
 const router = useRouter()
@@ -97,16 +97,20 @@ const types = ref([])
 const shops = ref([])
 const typeName = ref('')
 const isReachBottom = ref(false)
+let shopQueryToken = 0
 const params = ref({
   typeId: 0,
   current: 1,
   sortBy: '',
-  x: 120.149993,
-  y: 30.334229
+  x: undefined,
+  y: undefined
 })
 
 // 获取店铺类型列表
 const queryTypes = async () => {
+  if (types.value.length > 0) {
+    return
+  }
   try {
     const { data } = await getShopTypeList()
     types.value = data
@@ -118,23 +122,68 @@ const queryTypes = async () => {
 }
 
 // 获取店铺列表
-const queryShops = async () => {
+const queryShops = async ({ reset = false } = {}) => {
+  const token = ++shopQueryToken
+  const requestParams = { ...params.value }
   try {
-    const { data } = await getShopList(params.value)
+    const { data } = await getShopList(requestParams)
+    if (token !== shopQueryToken || requestParams.typeId !== params.value.typeId) {
+      return
+    }
     if (!data) return
     data.forEach((s) => (s.images = s.images.split(',')[0]))
-    shops.value = shops.value.concat(data)
+    shops.value = reset || requestParams.current === 1 ? data : shops.value.concat(data)
   } catch (error) {
     console.error(error)
     ElMessage.error('获取店铺列表失败')
   }
 }
 
+const resolveLocation = async () => {
+  try {
+    const { data } = await getShopLocationConfig()
+    if (!data?.realCoordinateEnabled) {
+      params.value.x = data?.mockX
+      params.value.y = data?.mockY
+      return
+    }
+    await useBrowserLocation()
+  } catch (error) {
+    console.error(error)
+    params.value.x = 120.149993
+    params.value.y = 30.334229
+  }
+}
+
+const useBrowserLocation = () =>
+  new Promise((resolve) => {
+    if (!navigator.geolocation) {
+      resolve()
+      return
+    }
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => {
+        params.value.x = coords.longitude
+        params.value.y = coords.latitude
+        resolve()
+      },
+      () => resolve(),
+      {
+        enableHighAccuracy: true,
+        timeout: 3000,
+        maximumAge: 60000
+      }
+    )
+  })
+
 // 处理类型选择
 const handleCommand = (type) => {
   console.log('handleCommand', type)
-  router.push({
-    path: '/shoplist',
+  if (!type?.id || Number(type.id) === params.value.typeId) {
+    return
+  }
+  router.replace({
+    path: '/shopList',
     query: {
       type: type.id,
       name: type.name
@@ -145,12 +194,15 @@ const handleCommand = (type) => {
 // 排序和查询
 const sortAndQuery = (sortBy) => {
   params.value.sortBy = sortBy
-  queryShops()
+  params.value.current = 1
+  shops.value = []
+  isReachBottom.value = false
+  queryShops({ reset: true })
 }
 
 // 返回上一页
 const goBack = () => {
-  router.back()
+  router.replace('/index')
 }
 
 // 跳转到店铺详情
@@ -171,13 +223,16 @@ const onScroll = throttle((e) => {
 }, 200)
 
 // 初始化
-const initData = () => {
+const initData = async () => {
+  shopQueryToken++
   params.value.typeId = Number(route.query.type) || 0
-  typeName.value = route.query.name || ''
   shops.value = [] // 清空店铺列表
   params.value.current = 1 // 重置页码
-  queryTypes()
-  queryShops()
+  await resolveLocation()
+  await queryTypes()
+  const selectedType = types.value.find((type) => Number(type.id) === params.value.typeId)
+  typeName.value = route.query.name || selectedType?.name || ''
+  await queryShops({ reset: true })
 }
 
 // 监听路由参数变化

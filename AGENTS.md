@@ -27,6 +27,7 @@ This file is for coding agents collaborating in this repository.
 3. Prohibit unauthorized modification of Redis, Kafka, MySQL connection addresses, service port, sharding rules and database configuration.
 4. Modify interface logic must confirm the existing Controller and Service definition first.
 5. High-concurrency core logic such as coupon stock deduction, delayed task, current limiting, cache refresh needs to refer to original framework logic before modification.
+6. Agents must not start project runtime services or middleware, including Kafka, Redis, backend service, and frontend dev server. When runtime verification is needed, tell the user which components to start manually.
 
 ## Change Archive Specification (Mandatory)
 All **major structural changes, module addition/deletion, core logic reconstruction, framework capability adjustment, database structure modification, dependency upgrade** must be recorded in `codex.md` after completion.

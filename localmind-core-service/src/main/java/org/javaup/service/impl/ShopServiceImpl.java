@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
+import org.javaup.config.NearbyLocationProperties;
 import org.javaup.core.RedisKeyManage;
 import org.javaup.dto.Result;
 import org.javaup.entity.Shop;
@@ -22,6 +23,7 @@ import org.redisson.api.RLock;
 import org.springframework.data.geo.Distance;
 import org.springframework.data.geo.GeoResult;
 import org.springframework.data.geo.GeoResults;
+import org.springframework.data.geo.Point;
 import org.springframework.data.redis.connection.RedisGeoCommands;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.domain.geo.GeoReference;
@@ -87,6 +89,9 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
     
     @Resource
     private SnowflakeIdGenerator snowflakeIdGenerator;
+
+    @Resource
+    private NearbyLocationProperties nearbyLocationProperties;
     
     
     /**
@@ -101,6 +106,7 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
         // 写入数据库
         shop.setId(snowflakeIdGenerator.nextId());
         save(shop);
+        refreshShopGeo(shop);
         // 写入布隆过滤器（商铺业务）
         bloomFilterHandlerFactory.get(BLOOM_FILTER_HANDLER_SHOP).add(String.valueOf(shop.getId()));
         // 返回店铺id
@@ -239,11 +245,32 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
         if (id == null) {
             return Result.fail("店铺id不能为空");
         }
+        Shop oldShop = getById(id);
         // 1.更新数据库
         updateById(shop);
+        removeShopGeo(oldShop);
+        refreshShopGeo(getById(id));
         // 2.删除缓存（Cache-Aside模式：更新DB后删除缓存，下次查询会加载最新数据）
         stringRedisTemplate.delete(CACHE_SHOP_KEY + id);
         return Result.ok();
+    }
+
+    private void refreshShopGeo(Shop shop) {
+        if (shop == null || shop.getId() == null || shop.getTypeId() == null || shop.getX() == null || shop.getY() == null) {
+            return;
+        }
+        String key = SHOP_GEO_KEY + shop.getTypeId();
+        stringRedisTemplate.opsForGeo().add(
+                key,
+                new RedisGeoCommands.GeoLocation<>(shop.getId().toString(), new Point(shop.getX(), shop.getY()))
+        );
+    }
+
+    private void removeShopGeo(Shop shop) {
+        if (shop == null || shop.getId() == null || shop.getTypeId() == null) {
+            return;
+        }
+        stringRedisTemplate.opsForGeo().remove(SHOP_GEO_KEY + shop.getTypeId(), shop.getId().toString());
     }
 
     /**
@@ -262,6 +289,11 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
      */
     @Override
     public Result queryShopByType(Integer typeId, Integer current, Double x, Double y) {
+        if (!Boolean.TRUE.equals(nearbyLocationProperties.getRealCoordinateEnabled())) {
+            x = nearbyLocationProperties.getMockX();
+            y = nearbyLocationProperties.getMockY();
+        }
+
         // ===== 无坐标模式：直接查数据库分页 =====
         if (x == null || y == null) {
             // 按类型分页查询数据库

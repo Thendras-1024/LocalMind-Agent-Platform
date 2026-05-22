@@ -4,6 +4,7 @@ package org.javaup.controller;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import jakarta.annotation.Resource;
+import org.javaup.config.NearbyLocationProperties;
 import org.javaup.dto.Result;
 import org.javaup.entity.Shop;
 import org.javaup.service.IShopService;
@@ -28,6 +29,9 @@ public class ShopController {
 
     @Resource
     public IShopService shopService;
+
+    @Resource
+    private NearbyLocationProperties nearbyLocationProperties;
 
     /**
      * 根据id查询商铺信息
@@ -74,6 +78,11 @@ public class ShopController {
             @RequestParam(value = "y", required = false) Double y
     ) {
        return shopService.queryShopByType(typeId, current, x, y);
+    }
+
+    @GetMapping("/location/config")
+    public Result queryLocationConfig() {
+        return Result.ok(nearbyLocationProperties);
     }
 
     /**

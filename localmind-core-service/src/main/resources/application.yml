@@ -71,6 +71,42 @@ bloom-filter:
       name: voucher-id-bloom
       expected-insertions: 100000
       false-probability: 0.01
+localmind:
+  nearby:
+    # true: use real browser/client coordinates; false: use configured mock coordinates.
+    real-coordinate-enabled: false
+    mock-x: 120.149993
+    mock-y: 30.334229
+  ai:
+    enabled: true
+    base-url: https://dashscope.aliyuncs.com/compatible-mode
+    api-key: ${DASHSCOPE_API_KEY:}
+    timeout-ms: 5000
+    max-message-chars: 500
+    max-session-id-chars: 80
+    max-candidates: 20
+    max-recommendation-size: 5
+    max-context-chars: 6000
+    max-vouchers-per-shop: 2
+    fallback-enabled: true
+    json-schema-enabled: true
+    chat:
+      model: ${AI_MODEL:qwen3.6-plus}
+      temperature: 0.2
+      max-tokens: 1200
+    embedding:
+      model: text-embedding-v3
+      dimensions: 1024
+    circuit-breaker:
+      key-prefix: agent:recommendation:llm:circuit
+      failure-threshold: 3
+      failure-window-seconds: 60
+      open-seconds: 60
+    rate-limit:
+      enabled: true
+      key-prefix: agent:recommendation:rate
+      window-seconds: 60
+      max-requests: 20
 management:
   endpoints:
     web:
