@@ -1,6 +1,6 @@
 package org.javaup.agent.service;
 
-import org.javaup.agent.config.LocalMindAiProperties;
+import org.javaup.agent.config.RecommendationAgentProperties;
 import org.javaup.agent.model.LlmRecommendationCandidate;
 import org.javaup.agent.model.LlmRecommendationContext;
 import org.javaup.agent.model.RecommendationCriteria;
@@ -16,7 +16,7 @@ class RecommendationContextBuilderTest {
 
     @Test
     void buildShouldTrimByCandidateLimitAndContextChars() {
-        LocalMindAiProperties properties = new LocalMindAiProperties();
+        RecommendationAgentProperties properties = new RecommendationAgentProperties();
         properties.setMaxCandidates(2);
         properties.setMaxContextChars(500);
         RecommendationContextBuilder builder = new RecommendationContextBuilder(properties);
@@ -28,12 +28,12 @@ class RecommendationContextBuilderTest {
         );
 
         LlmRecommendationContext context = builder.build(candidates,
-                new RecommendationCriteria().setSortBy("score"));
+                new RecommendationCriteria().setSortBy("compositeScore"));
 
         assertEquals(3, context.getOriginalCandidateSize());
         assertEquals(2, context.getIncludedCandidateSize());
         assertTrue(context.getTruncated());
-        assertEquals(2L, context.getCandidates().get(0).getShopId());
+        assertEquals(3L, context.getCandidates().get(0).getShopId());
     }
 
     private LlmRecommendationCandidate candidate(Long id, Integer score, Double distance, boolean history) {
@@ -43,6 +43,7 @@ class RecommendationContextBuilderTest {
                 .setScore(score / 10.0)
                 .setAvgPrice(100L)
                 .setDistance(distance)
+                .setRankScore(score / 10.0)
                 .setHasHistoryOrder(history)
                 .setReason("reason");
         return new LlmRecommendationCandidate().setShop(shop);

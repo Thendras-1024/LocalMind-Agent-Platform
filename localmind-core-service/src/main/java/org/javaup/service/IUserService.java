@@ -18,6 +18,8 @@ public interface IUserService extends IService<User> {
 
     Result<String> login(LoginFormDTO loginForm, HttpSession session);
 
+    Result<Void> logout(String token);
+
     Result<Void> sign();
 
     Result<Integer> signCount();

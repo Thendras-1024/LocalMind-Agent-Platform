@@ -2,9 +2,11 @@ package org.javaup.agent.dto;
 
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
+import java.io.Serializable;
+
 
 @Data
-public class RecommendationChatRequest {
+public class RecommendationChatRequest implements Serializable{
 
     private String sessionId;
 

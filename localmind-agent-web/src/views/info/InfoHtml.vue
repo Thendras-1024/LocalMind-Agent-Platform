@@ -276,38 +276,42 @@ const onScroll = (e) => {
   display: flex;
   flex-direction: column;
   height: 100vh;
-  background-color: #f5f5f5;
+  color: var(--lm-text);
+  background: var(--lm-bg);
 }
 
 .header {
   position: relative;
-  height: 44px;
+  min-height: var(--lm-header-height);
   display: flex;
   align-items: center;
   padding: 0 15px;
-  background: #fff;
-  border-bottom: 1px solid #f1f1f1;
+  background: rgba(255, 255, 255, 0.92);
+  border-bottom: 1px solid var(--lm-line);
   flex-shrink: 0;
+  backdrop-filter: blur(14px);
 }
 
 .header-back-btn {
-  font-size: 16px;
-  color: #333;
+  font-size: 20px;
+  color: var(--lm-primary);
 }
 
 .header-title {
   flex: 1;
   text-align: center;
   font-size: 16px;
-  font-weight: bold;
+  font-weight: 800;
 }
 
 .basic {
   display: flex;
   align-items: center;
-  padding: 15px;
-  background: #fff;
-  margin-top: 10px;
+  margin: 12px;
+  padding: 16px;
+  background: var(--lm-surface);
+  border-radius: var(--lm-radius);
+  box-shadow: var(--lm-shadow-soft);
 }
 
 .basic-icon {
@@ -330,41 +334,47 @@ const onScroll = (e) => {
 
 .name {
   font-size: 18px;
-  font-weight: bold;
+  font-weight: 900;
   margin-bottom: 5px;
 }
 
 .edit-btn {
   display: inline-block;
-  padding: 5px 10px;
-  background: #f5f5f5;
-  border-radius: 15px;
+  padding: 6px 12px;
+  background: var(--lm-primary-soft);
+  border-radius: 999px;
   font-size: 12px;
-  color: #666;
+  color: var(--lm-primary);
+  font-weight: 800;
   margin-top: 5px;
 }
 
 .logout-btn {
-  padding: 5px 10px;
-  background: #f5f5f5;
-  border-radius: 15px;
+  padding: 6px 12px;
+  background: #f7f0eb;
+  border-radius: 999px;
   font-size: 12px;
-  color: #666;
+  color: var(--lm-text-soft);
+  font-weight: 800;
 }
 
 .introduce {
-  padding: 15px;
-  background: #fff;
-  margin-top: 10px;
-  color: #999;
+  margin: 0 12px 12px;
+  padding: 14px;
+  background: var(--lm-surface);
+  border-radius: var(--lm-radius);
+  box-shadow: var(--lm-shadow-soft);
+  color: var(--lm-muted);
   font-size: 14px;
 }
 
 .content {
   flex: 1;
   overflow: hidden;
-  background: #fff;
-  margin-top: 10px;
+  margin: 0 12px 12px;
+  background: var(--lm-surface);
+  border-radius: var(--lm-radius);
+  box-shadow: var(--lm-shadow-soft);
 }
 
 :deep(.el-tabs__header) {
@@ -380,13 +390,13 @@ const onScroll = (e) => {
 .blog-item {
   display: flex;
   padding: 15px;
-  border-bottom: 1px solid #f1f1f1;
+  border-bottom: 1px solid var(--lm-line);
 }
 
 .blog-img {
   width: 80px;
   height: 80px;
-  border-radius: 4px;
+  border-radius: 14px;
   overflow: hidden;
   margin-right: 10px;
 }
@@ -406,7 +416,7 @@ const onScroll = (e) => {
 
 .blog-title {
   font-size: 16px;
-  font-weight: bold;
+  font-weight: 800;
   margin-bottom: 10px;
 }
 
@@ -415,7 +425,7 @@ const onScroll = (e) => {
   display: flex;
   align-items: center;
   font-size: 12px;
-  color: #999;
+  color: var(--lm-muted);
 }
 
 .blog-liked img {
@@ -437,7 +447,7 @@ const onScroll = (e) => {
 .blog-img2 {
   width: 100%;
   height: 200px;
-  border-radius: 4px;
+  border-radius: 14px;
   overflow: hidden;
   margin-bottom: 10px;
 }
@@ -471,13 +481,13 @@ const onScroll = (e) => {
 .blog-user-name {
   flex: 1;
   font-size: 14px;
-  color: #333;
+  color: var(--lm-text-soft);
 }
 
 .foot-bar {
-  height: 50px;
-  background: #fff;
-  border-top: 1px solid #f1f1f1;
+  height: 58px;
+  background: rgba(255, 255, 255, 0.94);
+  border-top: 1px solid var(--lm-line);
   flex-shrink: 0;
 }
 </style>

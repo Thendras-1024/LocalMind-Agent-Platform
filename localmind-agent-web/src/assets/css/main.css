@@ -1,48 +1,142 @@
+:root {
+    --lm-primary: #ff6b35;
+    --lm-primary-deep: #e84f1a;
+    --lm-primary-soft: #fff0e8;
+    --lm-bg: #fff8f2;
+    --lm-surface: #ffffff;
+    --lm-surface-warm: #fffaf6;
+    --lm-text: #201a17;
+    --lm-text-soft: #6f625c;
+    --lm-muted: #9b8f89;
+    --lm-line: #f0e4dc;
+    --lm-ai: #15b8a6;
+    --lm-ai-soft: #e8fbf8;
+    --lm-shadow: 0 12px 28px rgba(86, 46, 24, 0.1);
+    --lm-shadow-soft: 0 6px 18px rgba(86, 46, 24, 0.08);
+    --lm-radius: 16px;
+    --lm-radius-sm: 10px;
+    --lm-header-height: 52px;
+}
+
+* {
+    box-sizing: border-box;
+}
+
 html {
     font-size: 12px;
     width: 100%;
+    background: var(--lm-bg);
 }
-body{
+
+body {
     margin: 0;
+    color: var(--lm-text);
+    background:
+        radial-gradient(circle at 12% -10%, rgba(255, 183, 113, 0.24), transparent 28%),
+        linear-gradient(180deg, #fffaf6 0%, var(--lm-bg) 42%, #f8f5f1 100%);
+    font-family: "PingFang SC", "Microsoft YaHei", "Hiragino Sans GB", Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
 }
-html,body,#app{
+
+html,
+body,
+#app {
     height: 100%;
+}
+
+button,
+input,
+textarea {
+    font: inherit;
+}
+
+button {
+    -webkit-tap-highlight-color: transparent;
+}
+
+a {
+    color: var(--lm-primary);
+    text-decoration: none;
+}
+
+img {
+    display: block;
 }
 
 .el-tabs__item {
     font-size: 14px;
-    font-weight: bold;
+    font-weight: 700;
+    color: var(--lm-text-soft);
 }
+
+.el-tabs__item.is-active {
+    color: var(--lm-primary);
+}
+
 .el-tabs__active-bar {
-    height: 4px;
-    background-image: linear-gradient(to right, #F63, #f5b9a2);
+    height: 3px;
+    border-radius: 999px;
+    background-image: linear-gradient(90deg, var(--lm-primary), #ffb26d);
 }
+
+.el-input__wrapper,
+.el-textarea__inner {
+    border-radius: 14px;
+    box-shadow: 0 0 0 1px var(--lm-line) inset;
+    background: rgba(255, 255, 255, 0.92);
+}
+
+.el-input__wrapper.is-focus,
+.el-textarea__inner:focus {
+    box-shadow: 0 0 0 1px var(--lm-primary) inset, 0 0 0 4px rgba(255, 107, 53, 0.1);
+}
+
+.el-button {
+    border-radius: 14px;
+    font-weight: 700;
+}
+
+.el-button--success,
+.el-button--primary {
+    border-color: var(--lm-primary);
+    background: linear-gradient(135deg, var(--lm-primary), #ff8f57);
+}
+
+.el-rate__icon {
+    margin-right: 0;
+}
+
 .foot {
     width: 100%;
-    min-height: 54px;
-    height: 8vh;
+    min-height: 62px;
+    height: 68px;
     display: flex;
     justify-content: space-around;
     align-items: center;
-    box-shadow: 0 -1px 2px 1px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 -8px 24px rgba(53, 35, 25, 0.08);
     position: fixed;
     left: 0;
     right: 0;
     bottom: 0;
     z-index: 999;
-    background: #fff;
+    background: rgba(255, 255, 255, 0.94);
+    border-top: 1px solid rgba(240, 228, 220, 0.86);
+    backdrop-filter: blur(16px);
 }
 .foot .add-btn {
-    width: 38px;
-    height: 38px;
-    box-shadow: 0 0 3px 2px rgba(0, 0, 0, 0.1);
-    border-radius: 18px;
+    width: 42px;
+    height: 42px;
+    padding: 8px;
+    border-radius: 16px;
+    background: linear-gradient(135deg, var(--lm-primary), #ffb26d);
+    box-shadow: 0 10px 20px rgba(255, 107, 53, 0.28);
 }
-.foot-box{
+.foot-box {
     width: 20%;
-    color: #82848a;
+    color: var(--lm-muted);
     text-align: center;
     position: relative;
+    cursor: pointer;
 }
 .foot-view {
     font-size: 22px;
@@ -51,21 +145,17 @@ html,body,#app{
     align-items: center;
     justify-content: center;
 }
-/* 移除圆形背景，保留纯图标样式 */
-.foot-text{
+.foot-text {
     font-size: 12px;
-    margin-top: 4px;
+    margin-top: 5px;
+    font-weight: 600;
 }
-.foot-text, .foot-view{
+.foot-text,
+.foot-view {
     text-align: center;
 }
-.active{
-    color: #ff6633;
-}
-
-/*element-ui的评价星星间隙*/
-.el-rate__icon {
-    margin-right: 0;
+.active {
+    color: var(--lm-primary);
 }
 
 /* 秒杀确认遮罩的强化视觉效果 */
@@ -93,6 +183,5 @@ html,body,#app{
     color: #fff;
     font-size: 18px;
     font-weight: 600;
-    letter-spacing: 0.5px;
+    letter-spacing: 0;
 }
-

@@ -3,6 +3,7 @@ import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ArrowRight, Search } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores'
+import { resolveAssetPath } from '@/utils/asset'
 import {
   uploadBlogImage,
   deleteBlogImage,
@@ -110,7 +111,7 @@ const fileSelected = (event) => {
 
   uploadBlogImage(formData)
     .then((res) => {
-      fileList.value.push('/imgs' + res.data)
+      fileList.value.push(res.data)
     })
     .catch((err) => {
       ElMessage.error(err.message || '上传图片失败')
@@ -188,7 +189,7 @@ const publishBlog = async () => {
       </div>
       <div class="pic-list" v-if="fileList.length > 0">
         <div class="pic-box" v-for="(f, i) in fileList" :key="i">
-          <img :src="`/src/assets${f}`" alt="图片" />
+          <img :src="resolveAssetPath(f)" alt="图片" />
           <div class="delete" @click="deletePic(i)">
             <i class="iconfont icon-close"></i>
           </div>

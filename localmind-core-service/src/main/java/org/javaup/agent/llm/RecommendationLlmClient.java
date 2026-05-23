@@ -7,6 +7,4 @@ public interface RecommendationLlmClient {
     boolean isConfigured();
 
     LlmChatResult chat(List<LlmChatMessage> messages, LlmChatOptions options);
-
-    List<Double> embedding(String input);
 }

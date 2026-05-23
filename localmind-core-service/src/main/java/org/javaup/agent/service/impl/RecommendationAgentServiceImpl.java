@@ -2,9 +2,14 @@ package org.javaup.agent.service.impl;
 
 import cn.hutool.core.util.StrUtil;
 import com.alibaba.fastjson.JSON;
+import jakarta.annotation.PostConstruct;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
-import org.javaup.agent.config.LocalMindAiProperties;
+import org.bsc.langgraph4j.CompiledGraph;
+import org.bsc.langgraph4j.GraphStateException;
+import org.bsc.langgraph4j.StateGraph;
+import org.bsc.langgraph4j.state.AgentState;
+import org.javaup.agent.config.RecommendationAgentProperties;
 import org.javaup.agent.dto.RecommendationChatRequest;
 import org.javaup.agent.llm.LlmChatMessage;
 import org.javaup.agent.llm.LlmChatOptions;
@@ -17,7 +22,6 @@ import org.javaup.agent.model.LlmRecommendationCandidate;
 import org.javaup.agent.model.LlmRecommendationContext;
 import org.javaup.agent.model.LlmRecommendationOutput;
 import org.javaup.agent.model.RecommendationCriteria;
-import org.javaup.agent.parser.RecommendationIntentParser;
 import org.javaup.agent.service.IRecommendationAgentService;
 import org.javaup.agent.service.RecommendationContextBuilder;
 import org.javaup.agent.vo.RecommendationChatResponse;
@@ -25,24 +29,26 @@ import org.javaup.agent.vo.RecommendationCriteriaVo;
 import org.javaup.agent.vo.RecommendationShopVo;
 import org.javaup.entity.Shop;
 import org.javaup.entity.ShopType;
-import org.javaup.entity.Voucher;
-import org.javaup.entity.VoucherOrder;
-import org.javaup.enums.OrderStatus;
-import org.javaup.enums.VoucherStatus;
 import org.javaup.service.IShopService;
 import org.javaup.service.IShopTypeService;
-import org.javaup.service.IVoucherOrderService;
-import org.javaup.service.IVoucherService;
 import org.javaup.utils.UserHolder;
+import org.springframework.ai.converter.BeanOutputConverter;
+import org.springframework.data.geo.Distance;
+import org.springframework.data.geo.Circle;
+import org.springframework.data.geo.GeoResult;
+import org.springframework.data.geo.GeoResults;
+import org.springframework.data.geo.Metrics;
+import org.springframework.data.geo.Point;
+import org.springframework.data.redis.connection.RedisGeoCommands;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -54,19 +60,26 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import static org.bsc.langgraph4j.GraphDefinition.END;
+import static org.bsc.langgraph4j.GraphDefinition.START;
+import static org.bsc.langgraph4j.action.AsyncEdgeAction.edge_async;
+import static org.bsc.langgraph4j.action.AsyncNodeAction.node_async;
+import static org.javaup.utils.RedisConstants.SHOP_GEO_KEY;
+
 @Slf4j
 @Service
 public class RecommendationAgentServiceImpl implements IRecommendationAgentService {
 
     private static final String CHAT_KEY_PREFIX = "agent:recommendation:chat:";
+    private static final String SESSION_CRITERIA_KEY_PREFIX = "agent:recommendation:session:";
     private static final long CHAT_TTL_HOURS = 1L;
-    private static final int DEFAULT_RECOMMENDATION_SIZE = 5;
+    private static final int DEFAULT_RECOMMENDATION_SIZE = 3;
     private static final int DEFAULT_RADIUS_METERS = 5000;
-    private static final int MAX_RADIUS_METERS = 20000;
-    private static final Set<String> ALLOWED_SORTS = Set.of("score", "distance", "price");
+    private static final int GEO_CANDIDATE_LIMIT = 200;
+    private static final Set<Integer> ALLOWED_RADIUS_METERS = Set.of(3000, 5000, 10000);
+    private static final Set<String> ALLOWED_SORTS = Set.of("compositeScore", "distance", "price");
 
-    @Resource
-    private RecommendationIntentParser recommendationIntentParser;
+    private CompiledGraph<RecommendationWorkflowState> recommendationGraph;
 
     @Resource
     private RecommendationLlmClient recommendationLlmClient;
@@ -84,7 +97,7 @@ public class RecommendationAgentServiceImpl implements IRecommendationAgentServi
     private RecommendationLlmCircuitBreaker recommendationLlmCircuitBreaker;
 
     @Resource
-    private LocalMindAiProperties aiProperties;
+    private RecommendationAgentProperties aiProperties;
 
     @Resource
     private IShopService shopService;
@@ -93,83 +106,202 @@ public class RecommendationAgentServiceImpl implements IRecommendationAgentServi
     private IShopTypeService shopTypeService;
 
     @Resource
-    private IVoucherService voucherService;
-
-    @Resource
-    private IVoucherOrderService voucherOrderService;
-
-    @Resource
     private StringRedisTemplate stringRedisTemplate;
+
+    @PostConstruct
+    public void initRecommendationGraph() throws GraphStateException {
+        recommendationGraph = new StateGraph<>(RecommendationWorkflowState::new)
+                .addNode("session_memory", node_async(this::sessionMemoryNode))
+                .addNode("input_guard", node_async(this::inputGuardNode))
+                .addNode("llm_gate", node_async(this::llmGateNode))
+                .addNode("intent_extract", node_async(this::intentExtractNode))
+                .addNode("intent_safety", node_async(this::intentSafetyNode))
+                .addNode("criteria_merge", node_async(this::criteriaMergeNode))
+                .addNode("required_check", node_async(this::requiredCheckNode))
+                .addNode("candidate_recall", node_async(this::candidateRecallNode))
+                .addNode("context_build", node_async(this::contextBuildNode))
+                .addNode("llm_rank", node_async(this::llmRankNode))
+                .addNode("response_build", node_async(this::responseBuildNode))
+                .addEdge(START, "session_memory")
+                .addEdge("session_memory", "input_guard")
+                .addConditionalEdges("input_guard", edge_async(state -> state.<String>value("route").orElse("continue")),
+                        Map.of("direct_response", END, "continue", "llm_gate"))
+                .addConditionalEdges("llm_gate", edge_async(state -> state.<String>value("route").orElse("continue")),
+                        Map.of("direct_response", END, "continue", "intent_extract"))
+                .addEdge("intent_extract", "intent_safety")
+                .addConditionalEdges("intent_safety", edge_async(state -> state.<String>value("route").orElse("continue")),
+                        Map.of("direct_response", END, "continue", "criteria_merge"))
+                .addEdge("criteria_merge", "required_check")
+                .addConditionalEdges("required_check", edge_async(state -> state.<String>value("route").orElse("continue")),
+                        Map.of("direct_response", END, "continue", "candidate_recall"))
+                .addConditionalEdges("candidate_recall", edge_async(state -> state.<String>value("route").orElse("continue")),
+                        Map.of("direct_response", END, "continue", "context_build"))
+                .addEdge("context_build", "llm_rank")
+                .addEdge("llm_rank", "response_build")
+                .addEdge("response_build", END)
+                .compile();
+    }
 
     @Override
     public RecommendationChatResponse chat(RecommendationChatRequest request) {
+        return chatByGraph(request);
+    }
+
+    private RecommendationChatResponse chatByGraph(RecommendationChatRequest request) {
         Long userId = UserHolder.getUser().getId();
         String sessionId = normalizeSessionId(request.getSessionId());
-        RecommendationCriteria ruleCriteria = normalizeCriteria(recommendationIntentParser.parse(request.getMessage()), null);
-
-        RecommendationChatResponse response;
-        if (StrUtil.length(request.getMessage()) > aiProperties.getMaxMessageChars()) {
-            response = clarificationResponse(sessionId, ruleCriteria, List.of("message"),
-                    "这段需求有点长，请把人数、预算、距离和想去的类型压缩成一句话再发我。");
-            saveConversation(userId, sessionId, request, response);
-            return response;
-        }
-        if (isUnsafeInput(request.getMessage())) {
-            response = safetyResponse(sessionId, ruleCriteria);
-            saveConversation(userId, sessionId, request, response);
-            return response;
-        }
-
-        if (!shouldUseLlm(userId)) {
-            response = fallbackChat(userId, sessionId, request, ruleCriteria, "llm_skipped");
-            saveConversation(userId, sessionId, request, response);
-            return response;
-        }
-
         try {
-            LlmIntentOutput intent = extractIntent(request.getMessage(), ruleCriteria);
-            if (!Boolean.TRUE.equals(intent.getSafe()) || !Boolean.TRUE.equals(intent.getLocalLifeRecommendation())) {
-                response = safetyResponse(sessionId, ruleCriteria, StrUtil.blankToDefault(intent.getSafetyReply(),
-                        "我只能帮你做本地生活门店、优惠和消费推荐。可以告诉我想去的类型、预算、人数和距离。"));
-                saveConversation(userId, sessionId, request, response);
-                recommendationLlmCircuitBreaker.recordSuccess();
-                return response;
+            RecommendationWorkflowState state = recommendationGraph.invoke(new HashMap<>(Map.of(
+                    "userId", userId,
+                    "sessionId", sessionId,
+                    "request", request
+            ))).orElseThrow(() -> new IllegalStateException("recommendation graph returned empty state"));
+            RecommendationChatResponse response = getStateValue(state, "response");
+            if (response == null) {
+                throw new IllegalStateException("recommendation graph returned empty response");
             }
-
-            RecommendationCriteria criteria = normalizeCriteria(intent.getCriteria(), ruleCriteria);
-            List<String> missingFields = mergeMissingFields(intent.getMissingFields(), resolveMissingFields(request, criteria));
-            if (!missingFields.isEmpty()) {
-                response = clarificationResponse(sessionId, criteria, missingFields, buildClarificationReply(criteria, missingFields));
-                saveConversation(userId, sessionId, request, response);
-                recommendationLlmCircuitBreaker.recordSuccess();
-                return response;
-            }
-
-            List<LlmRecommendationCandidate> candidates = queryCandidates(userId, request, criteria);
-            if (candidates.isEmpty()) {
-                response = emptyRecommendationResponse(sessionId, criteria);
-                saveConversation(userId, sessionId, request, response);
-                recommendationLlmCircuitBreaker.recordSuccess();
-                return response;
-            }
-
-            LlmRecommendationContext context = recommendationContextBuilder.build(candidates, criteria);
-            if (context.getCandidates().isEmpty()) {
-                throw new IllegalStateException("candidate context exceeds max size");
-            }
-            LlmRecommendationOutput output = recommendByLlm(request.getMessage(), criteria, context);
-            response = buildLlmResponse(sessionId, criteria, context, output);
             saveConversation(userId, sessionId, request, response);
-            recommendationLlmCircuitBreaker.recordSuccess();
+            if (Boolean.TRUE.equals(getStateValue(state, "llmAttempted", false))) {
+                recommendationLlmCircuitBreaker.recordSuccess();
+            }
             return response;
         } catch (Exception e) {
-            log.warn("Recommendation LLM flow failed, fallback to rule flow, userId={}, sessionId={}, reason={}",
+            log.warn("Recommendation LangGraph4j flow failed, fallback to rule response, userId={}, sessionId={}, reason={}",
                     userId, sessionId, e.getMessage(), e);
-            recommendationLlmCircuitBreaker.recordFailure(e.getClass().getSimpleName());
-            response = fallbackChat(userId, sessionId, request, ruleCriteria, "llm_failed");
+            RecommendationCriteria criteria = normalizeCriteria(null, loadSessionCriteria(sessionId));
+            RecommendationChatResponse response = fallbackChat(userId, sessionId, request, criteria, "graph_failed");
             saveConversation(userId, sessionId, request, response);
             return response;
         }
+    }
+
+    private Map<String, Object> sessionMemoryNode(RecommendationWorkflowState state) {
+        String sessionId = getStateValue(state, "sessionId", "");
+        return put("previousCriteria", loadSessionCriteria(sessionId));
+    }
+
+    private Map<String, Object> inputGuardNode(RecommendationWorkflowState state) {
+        RecommendationChatRequest request = getStateValue(state, "request");
+        String sessionId = getStateValue(state, "sessionId", "");
+        RecommendationCriteria previousCriteria = getStateValue(state, "previousCriteria", new RecommendationCriteria());
+        if (StrUtil.length(request.getMessage()) > aiProperties.getMaxMessageChars()) {
+            return put("response", clarificationResponse(sessionId, previousCriteria, List.of("message"),
+                    "用户输入过长，请缩短需求后再试。"), "route", "direct_response");
+        }
+        if (isUnsafeInput(request.getMessage())) {
+            return put("response", safetyResponse(sessionId, previousCriteria), "route", "direct_response");
+        }
+        return put("route", "continue");
+    }
+
+    private Map<String, Object> llmGateNode(RecommendationWorkflowState state) {
+        Long userId = getStateValue(state, "userId");
+        String sessionId = getStateValue(state, "sessionId", "");
+        RecommendationChatRequest request = getStateValue(state, "request");
+        RecommendationCriteria previousCriteria = getStateValue(state, "previousCriteria", new RecommendationCriteria());
+        if (!shouldUseLlm(userId)) {
+            log.info("Recommendation agent skip LLM, userId={}, sessionId={}, reason=llm_gate_closed", userId, sessionId);
+            return put("response", fallbackChat(userId, sessionId, request, previousCriteria, "llm_skipped"),
+                    "route", "direct_response");
+        }
+        log.info("Recommendation agent enter LLM workflow, userId={}, sessionId={}, messageLength={}",
+                userId, sessionId, request == null ? 0 : StrUtil.length(request.getMessage()));
+        return put("route", "continue", "llmAttempted", true);
+    }
+
+    private Map<String, Object> intentExtractNode(RecommendationWorkflowState state) {
+        RecommendationChatRequest request = getStateValue(state, "request");
+        RecommendationCriteria previousCriteria = getStateValue(state, "previousCriteria", new RecommendationCriteria());
+        return put("intent", extractIntent(request.getMessage(), previousCriteria));
+    }
+
+    private Map<String, Object> intentSafetyNode(RecommendationWorkflowState state) {
+        String sessionId = getStateValue(state, "sessionId", "");
+        RecommendationCriteria previousCriteria = getStateValue(state, "previousCriteria", new RecommendationCriteria());
+        LlmIntentOutput intent = getStateValue(state, "intent");
+        if (intent == null || !Boolean.TRUE.equals(intent.getSafe()) || !Boolean.TRUE.equals(intent.getLocalLifeRecommendation())) {
+            String reply = intent == null ? null : intent.getSafetyReply();
+            return put("response", safetyResponse(sessionId, previousCriteria, StrUtil.blankToDefault(reply,
+                    "我只能处理本地生活门店推荐相关需求，请换一种门店推荐需求描述。")), "route", "direct_response");
+        }
+        return put("route", "continue");
+    }
+
+    private Map<String, Object> criteriaMergeNode(RecommendationWorkflowState state) {
+        RecommendationCriteria previousCriteria = getStateValue(state, "previousCriteria", new RecommendationCriteria());
+        LlmIntentOutput intent = getStateValue(state, "intent");
+        return put("criteria", normalizeCriteria(intent == null ? null : intent.getCriteria(), previousCriteria));
+    }
+
+    private Map<String, Object> requiredCheckNode(RecommendationWorkflowState state) {
+        String sessionId = getStateValue(state, "sessionId", "");
+        RecommendationChatRequest request = getStateValue(state, "request");
+        RecommendationCriteria criteria = getStateValue(state, "criteria", new RecommendationCriteria());
+        LlmIntentOutput intent = getStateValue(state, "intent");
+        List<String> missingFields = mergeMissingFields(intent == null ? null : intent.getMissingFields(),
+                resolveMissingFields(request, criteria));
+        if (!missingFields.isEmpty()) {
+            return put("response", clarificationResponse(sessionId, criteria, missingFields,
+                    buildClarificationReply(criteria, missingFields)), "route", "direct_response");
+        }
+        return put("missingFields", missingFields, "route", "continue");
+    }
+
+    private Map<String, Object> candidateRecallNode(RecommendationWorkflowState state) {
+        Long userId = getStateValue(state, "userId");
+        String sessionId = getStateValue(state, "sessionId", "");
+        RecommendationChatRequest request = getStateValue(state, "request");
+        RecommendationCriteria criteria = getStateValue(state, "criteria", new RecommendationCriteria());
+        List<LlmRecommendationCandidate> candidates = queryCandidates(userId, request, criteria);
+        log.info("Recommendation agent candidate recall finished, userId={}, sessionId={}, typeId={}, radiusMeters={}, candidateSize={}",
+                userId, sessionId, criteria.getTypeId(), criteria.getRadiusMeters(), candidates.size());
+        if (candidates.isEmpty()) {
+            return put("response", emptyRecommendationResponse(sessionId, criteria), "route", "direct_response");
+        }
+        return put("candidates", candidates, "route", "continue");
+    }
+
+    private Map<String, Object> contextBuildNode(RecommendationWorkflowState state) {
+        RecommendationCriteria criteria = getStateValue(state, "criteria", new RecommendationCriteria());
+        List<LlmRecommendationCandidate> candidates = getStateValue(state, "candidates", new ArrayList<>());
+        LlmRecommendationContext context = recommendationContextBuilder.build(candidates, criteria);
+        if (context.getCandidates().isEmpty()) {
+            throw new IllegalStateException("candidate context exceeds max size");
+        }
+        return put("context", context);
+    }
+
+    private Map<String, Object> llmRankNode(RecommendationWorkflowState state) {
+        RecommendationChatRequest request = getStateValue(state, "request");
+        RecommendationCriteria criteria = getStateValue(state, "criteria", new RecommendationCriteria());
+        LlmRecommendationContext context = getStateValue(state, "context");
+        return put("output", recommendByLlm(request.getMessage(), criteria, context));
+    }
+
+    private Map<String, Object> responseBuildNode(RecommendationWorkflowState state) {
+        String sessionId = getStateValue(state, "sessionId", "");
+        RecommendationCriteria criteria = getStateValue(state, "criteria", new RecommendationCriteria());
+        LlmRecommendationContext context = getStateValue(state, "context");
+        LlmRecommendationOutput output = getStateValue(state, "output");
+        return put("response", buildLlmResponse(sessionId, criteria, context, output));
+    }
+
+    private <T> T getStateValue(RecommendationWorkflowState state, String key) {
+        return state.<T>value(key).orElse(null);
+    }
+
+    private <T> T getStateValue(RecommendationWorkflowState state, String key, T defaultValue) {
+        return state.<T>value(key).orElse(defaultValue);
+    }
+
+    private Map<String, Object> put(Object... values) {
+        Map<String, Object> map = new HashMap<>();
+        for (int i = 0; i + 1 < values.length; i += 2) {
+            if (values[i + 1] != null) {
+                map.put(String.valueOf(values[i]), values[i + 1]);
+            }
+        }
+        return map;
     }
 
     private boolean shouldUseLlm(Long userId) {
@@ -190,30 +322,52 @@ public class RecommendationAgentServiceImpl implements IRecommendationAgentServi
         return count == null || count <= aiProperties.getRateLimit().getMaxRequests();
     }
 
-    private LlmIntentOutput extractIntent(String message, RecommendationCriteria ruleCriteria) {
+    private LlmIntentOutput extractIntent(String message, RecommendationCriteria fallbackCriteria) {
         List<RecommendationPromptFactory.ShopTypeView> shopTypes = shopTypeService.lambdaQuery()
                 .orderByAsc(ShopType::getSort)
                 .list()
                 .stream()
                 .map(type -> new RecommendationPromptFactory.ShopTypeView(type.getId(), type.getName()))
                 .collect(Collectors.toList());
+        log.info("Recommendation agent start LLM intent extraction, messageLength={}, shopTypeSize={}",
+                StrUtil.length(message), shopTypes.size());
         List<LlmChatMessage> messages = recommendationPromptFactory.buildIntentMessages(message, shopTypes);
         LlmIntentOutput output = callStructured(messages,
                 recommendationPromptFactory.intentJsonSchemaResponseFormat(),
                 LlmIntentOutput.class);
         if (output.getCriteria() == null) {
-            output.setCriteria(ruleCriteria);
+            output.setCriteria(fallbackCriteria);
         }
+        RecommendationCriteria criteria = output.getCriteria();
+        log.info("Recommendation agent LLM intent extracted, safe={}, localLife={}, typeId={}, typeName={}, peopleCount={}, radiusMeters={}, budgetMin={}, budgetMax={}, startTime={}, endTime={}",
+                output.getSafe(), output.getLocalLifeRecommendation(),
+                criteria == null ? null : criteria.getTypeId(),
+                criteria == null ? null : criteria.getTypeName(),
+                criteria == null ? null : criteria.getPeopleCount(),
+                criteria == null ? null : criteria.getRadiusMeters(),
+                criteria == null ? null : criteria.getBudgetMin(),
+                criteria == null ? null : criteria.getBudgetMax(),
+                criteria == null ? null : criteria.getStartTime(),
+                criteria == null ? null : criteria.getEndTime());
         return output;
     }
 
     private LlmRecommendationOutput recommendByLlm(String message,
                                                    RecommendationCriteria criteria,
                                                    LlmRecommendationContext context) {
+        log.info("Recommendation agent start LLM ranking, typeId={}, radiusMeters={}, candidateSize={}, contextChars={}",
+                criteria.getTypeId(), criteria.getRadiusMeters(),
+                context == null || context.getCandidates() == null ? 0 : context.getCandidates().size(),
+                context == null ? 0 : context.getContextChars());
         List<LlmChatMessage> messages = recommendationPromptFactory.buildRecommendationMessages(message, criteria, context);
-        return callStructured(messages,
+        LlmRecommendationOutput output = callStructured(messages,
                 recommendationPromptFactory.recommendationJsonSchemaResponseFormat(),
                 LlmRecommendationOutput.class);
+        log.info("Recommendation agent LLM ranking finished, needClarification={}, selectedSize={}, missingFields={}",
+                output.getNeedClarification(),
+                output.getRecommendations() == null ? 0 : output.getRecommendations().size(),
+                output.getMissingFields());
+        return output;
     }
 
     private <T> T callStructured(List<LlmChatMessage> messages,
@@ -247,14 +401,16 @@ public class RecommendationAgentServiceImpl implements IRecommendationAgentServi
 
     private LlmChatOptions defaultChatOptions(com.alibaba.fastjson.JSONObject responseFormat) {
         return new LlmChatOptions()
-                .setModel(aiProperties.getChat().getModel())
-                .setTemperature(aiProperties.getChat().getTemperature())
-                .setMaxTokens(aiProperties.getChat().getMaxTokens())
                 .setResponseFormat(responseFormat);
     }
 
     private <T> T parseJsonContent(String content, Class<T> type) {
-        return llmJsonParser.parseObject(content, type);
+        String json = llmJsonParser.extractJsonObject(content);
+        try {
+            return new BeanOutputConverter<>(type).convert(json);
+        } catch (RuntimeException e) {
+            return llmJsonParser.parseObject(json, type);
+        }
     }
 
     private String repairJson(String invalidContent) {
@@ -289,6 +445,9 @@ public class RecommendationAgentServiceImpl implements IRecommendationAgentServi
 
     private List<String> resolveMissingFields(RecommendationChatRequest request, RecommendationCriteria criteria) {
         List<String> missingFields = new ArrayList<>();
+        if (criteria.getTypeId() == null) {
+            missingFields.add("type");
+        }
         if (Boolean.TRUE.equals(criteria.getNeedLocation()) && (request.getX() == null || request.getY() == null)) {
             missingFields.add("location");
         }
@@ -299,58 +458,86 @@ public class RecommendationAgentServiceImpl implements IRecommendationAgentServi
                                                              RecommendationChatRequest request,
                                                              RecommendationCriteria criteria) {
         List<RecommendationShopVo> shops = recommendByRule(userId, request, criteria,
-                Math.max(aiProperties.getMaxCandidates() * 2, aiProperties.getMaxRecommendationSize()));
+                Math.max(aiProperties.getMaxCandidates(), aiProperties.getMaxRecommendationSize()));
         if (shops.isEmpty()) {
             return new ArrayList<>();
         }
-        List<Long> shopIds = shops.stream()
-                .map(RecommendationShopVo::getShopId)
-                .filter(Objects::nonNull)
-                .collect(Collectors.toList());
-        Map<Long, Shop> shopMap = shopService.lambdaQuery()
-                .in(Shop::getId, shopIds)
-                .list()
-                .stream()
-                .collect(Collectors.toMap(Shop::getId, Function.identity(), (left, right) -> left));
-        Map<Long, List<Voucher>> voucherMap = queryVoucherMap(shopIds);
         return shops.stream()
-                .map(shop -> {
-                    Shop raw = shopMap.get(shop.getShopId());
-                    List<LlmRecommendationCandidate.VoucherDigest> vouchers = voucherMap
-                            .getOrDefault(shop.getShopId(), List.of())
-                            .stream()
-                            .limit(aiProperties.getMaxVouchersPerShop())
-                            .map(LlmRecommendationCandidate.VoucherDigest::from)
-                            .collect(Collectors.toList());
-                    return new LlmRecommendationCandidate()
-                            .setShop(shop)
-                            .setOpenHours(raw == null ? null : raw.getOpenHours())
-                            .setVouchers(vouchers);
-                })
+                .map(shop -> new LlmRecommendationCandidate().setShop(shop))
                 .collect(Collectors.toList());
     }
 
-    private Map<Long, List<Voucher>> queryVoucherMap(List<Long> shopIds) {
-        if (shopIds.isEmpty()) {
-            return new HashMap<>();
+    private GeoRadiusResult geoRadiusShopIds(RecommendationCriteria criteria,
+                                             RecommendationChatRequest request,
+                                             int limit) {
+        if (criteria.getTypeId() == null || request.getX() == null || request.getY() == null) {
+            log.info("Recommendation agent skip GEO recall, typeId={}, xPresent={}, yPresent={}",
+                    criteria.getTypeId(), request.getX() != null, request.getY() != null);
+            return new GeoRadiusResult(new ArrayList<>(), new HashMap<>());
         }
-        List<Voucher> vouchers = voucherService.lambdaQuery()
-                .in(Voucher::getShopId, shopIds)
-                .eq(Voucher::getStatus, VoucherStatus.AVAILABLE.getCode())
+        String key = SHOP_GEO_KEY + criteria.getTypeId();
+        GeoResults<RedisGeoCommands.GeoLocation<String>> results = stringRedisTemplate.opsForGeo()
+                .radius(
+                        key,
+                        new Circle(new Point(request.getX(), request.getY()), new Distance(criteria.getRadiusMeters() / 1000.0, Metrics.KILOMETERS)),
+                        RedisGeoCommands.GeoRadiusCommandArgs.newGeoRadiusArgs()
+                                .includeDistance()
+                                .sortAscending()
+                                .limit(Math.min(limit, GEO_CANDIDATE_LIMIT))
+                );
+        if (results == null || results.getContent().isEmpty()) {
+            log.info("Recommendation agent GEO recall empty, key={}, typeId={}, radiusMeters={}, limit={}",
+                    key, criteria.getTypeId(), criteria.getRadiusMeters(), Math.min(limit, GEO_CANDIDATE_LIMIT));
+            return new GeoRadiusResult(new ArrayList<>(), new HashMap<>());
+        }
+        List<Long> shopIds = new ArrayList<>();
+        Map<Long, Double> distanceMap = new HashMap<>();
+        for (GeoResult<RedisGeoCommands.GeoLocation<String>> result : results.getContent()) {
+            String shopIdText = result.getContent().getName();
+            try {
+                Long shopId = Long.valueOf(shopIdText);
+                shopIds.add(shopId);
+                distanceMap.put(shopId, result.getDistance().getValue() * result.getDistance().getMetric().getMultiplier());
+            } catch (NumberFormatException ignored) {
+                log.warn("Ignore invalid shop id from redis geo, key={}, shopId={}", key, shopIdText);
+            }
+        }
+        log.info("Recommendation agent GEO recall finished, key={}, typeId={}, radiusMeters={}, resultSize={}",
+                key, criteria.getTypeId(), criteria.getRadiusMeters(), shopIds.size());
+        return new GeoRadiusResult(shopIds, distanceMap);
+    }
+
+    private List<Shop> recallShopDetails(Long typeId, List<Long> shopIds) {
+        if (typeId == null || shopIds.isEmpty()) {
+            return new ArrayList<>();
+        }
+        String idStr = shopIds.stream().map(String::valueOf).collect(Collectors.joining(","));
+        return shopService.lambdaQuery()
+                .eq(Shop::getTypeId, typeId)
+                .in(Shop::getId, shopIds)
+                .last("ORDER BY FIELD(id," + idStr + ")")
                 .list();
-        return vouchers.stream().collect(Collectors.groupingBy(Voucher::getShopId));
     }
 
     private List<RecommendationShopVo> recommendByRule(Long userId,
                                                        RecommendationChatRequest request,
                                                        RecommendationCriteria criteria,
                                                        int limit) {
-        List<Shop> shops = shopService.lambdaQuery()
-                .eq(Shop::getTypeId, criteria.getTypeId())
-                .list();
-        Set<Long> historyShopIds = queryHistoryShopIds(userId);
+        GeoRadiusResult geoResult = geoRadiusShopIds(criteria, request, GEO_CANDIDATE_LIMIT);
+        if (geoResult.shopIds().isEmpty()) {
+            return new ArrayList<>();
+        }
+        List<Shop> shops = recallShopDetails(criteria.getTypeId(), geoResult.shopIds());
+        if (shops.isEmpty()) {
+            return new ArrayList<>();
+        }
+        int maxSold = shops.stream()
+                .map(Shop::getSold)
+                .filter(Objects::nonNull)
+                .max(Integer::compareTo)
+                .orElse(0);
         return shops.stream()
-                .map(shop -> toRecommendation(shop, criteria, request, historyShopIds.contains(shop.getId())))
+                .map(shop -> toRecommendation(shop, criteria, geoResult.distanceMap().get(shop.getId()), maxSold))
                 .filter(Objects::nonNull)
                 .sorted(buildComparator(criteria))
                 .limit(limit)
@@ -359,16 +546,8 @@ public class RecommendationAgentServiceImpl implements IRecommendationAgentServi
 
     private RecommendationShopVo toRecommendation(Shop shop,
                                                   RecommendationCriteria criteria,
-                                                  RecommendationChatRequest request,
-                                                  boolean hasHistoryOrder) {
-        Double distance = null;
-        if (request.getX() != null && request.getY() != null && shop.getX() != null && shop.getY() != null) {
-            distance = calculateDistanceMeters(request.getY(), request.getX(), shop.getY(), shop.getX());
-            if (criteria.getRadiusMeters() != null && distance > criteria.getRadiusMeters()) {
-                return null;
-            }
-        }
-
+                                                  Double distance,
+                                                  int maxSold) {
         Long estimatedTotalPrice = estimateTotalPrice(shop.getAvgPrice(), criteria.getPeopleCount());
         if (criteria.getBudgetMin() != null && estimatedTotalPrice != null && estimatedTotalPrice < criteria.getBudgetMin()) {
             return null;
@@ -376,10 +555,16 @@ public class RecommendationAgentServiceImpl implements IRecommendationAgentServi
         if (criteria.getBudgetMax() != null && estimatedTotalPrice != null && estimatedTotalPrice > criteria.getBudgetMax()) {
             return null;
         }
+        if (!matchOpenHours(shop, criteria)) {
+            return null;
+        }
+        double compositeScore = calculateCompositeScore(shop, maxSold);
+        double rankScore = calculateRankScore(compositeScore, distance, criteria, estimatedTotalPrice);
 
         return new RecommendationShopVo()
                 .setShopId(shop.getId())
                 .setName(shop.getName())
+                .setTypeName(criteria.getTypeName())
                 .setArea(shop.getArea())
                 .setAddress(shop.getAddress())
                 .setImage(firstImage(shop.getImages()))
@@ -390,8 +575,10 @@ public class RecommendationAgentServiceImpl implements IRecommendationAgentServi
                 .setAvgPrice(shop.getAvgPrice())
                 .setDistance(distance)
                 .setEstimatedTotalPrice(estimatedTotalPrice)
-                .setHasHistoryOrder(hasHistoryOrder)
-                .setReason(buildReason(shop, criteria, distance, estimatedTotalPrice, hasHistoryOrder));
+                .setCompositeScore(round4(compositeScore))
+                .setRankScore(round4(rankScore))
+                .setHasHistoryOrder(false)
+                .setReason(buildReason(shop, criteria, distance, estimatedTotalPrice, false));
     }
 
     private RecommendationChatResponse buildLlmResponse(String sessionId,
@@ -423,6 +610,8 @@ public class RecommendationAgentServiceImpl implements IRecommendationAgentServi
         if (selected.isEmpty() && !Boolean.TRUE.equals(output.getNeedClarification())) {
             throw new IllegalStateException("LLM selected no valid candidate shops");
         }
+        log.info("Recommendation agent response built, sessionId={}, selectedSize={}, needClarification={}",
+                sessionId, selected.size(), output.getNeedClarification());
         return new RecommendationChatResponse()
                 .setSessionId(sessionId)
                 .setCriteria(toCriteriaVo(criteria))
@@ -436,6 +625,7 @@ public class RecommendationAgentServiceImpl implements IRecommendationAgentServi
         return new RecommendationShopVo()
                 .setShopId(source.getShopId())
                 .setName(source.getName())
+                .setTypeName(source.getTypeName())
                 .setArea(source.getArea())
                 .setAddress(source.getAddress())
                 .setImage(source.getImage())
@@ -444,45 +634,21 @@ public class RecommendationAgentServiceImpl implements IRecommendationAgentServi
                 .setAvgPrice(source.getAvgPrice())
                 .setDistance(source.getDistance())
                 .setEstimatedTotalPrice(source.getEstimatedTotalPrice())
+                .setCompositeScore(source.getCompositeScore())
+                .setRankScore(source.getRankScore())
                 .setHasHistoryOrder(source.getHasHistoryOrder())
                 .setReason(reason);
     }
 
-    private Set<Long> queryHistoryShopIds(Long userId) {
-        List<VoucherOrder> orders = voucherOrderService.lambdaQuery()
-                .eq(VoucherOrder::getUserId, userId)
-                .eq(VoucherOrder::getStatus, OrderStatus.NORMAL.getCode())
-                .list();
-        if (orders.isEmpty()) {
-            return new HashSet<>();
-        }
-        List<Long> voucherIds = orders.stream()
-                .map(VoucherOrder::getVoucherId)
-                .filter(Objects::nonNull)
-                .distinct()
-                .collect(Collectors.toList());
-        if (voucherIds.isEmpty()) {
-            return new HashSet<>();
-        }
-        return voucherService.lambdaQuery()
-                .in(Voucher::getId, voucherIds)
-                .list()
-                .stream()
-                .map(Voucher::getShopId)
-                .filter(Objects::nonNull)
-                .collect(Collectors.toSet());
-    }
-
     private Comparator<RecommendationShopVo> buildComparator(RecommendationCriteria criteria) {
-        Comparator<RecommendationShopVo> comparator = Comparator
-                .comparing((RecommendationShopVo shop) -> Boolean.TRUE.equals(shop.getHasHistoryOrder())).reversed();
+        Comparator<RecommendationShopVo> comparator;
         if ("distance".equals(criteria.getSortBy())) {
-            comparator = comparator.thenComparing(shop -> shop.getDistance() == null ? Double.MAX_VALUE : shop.getDistance());
+            comparator = Comparator.comparing(shop -> shop.getDistance() == null ? Double.MAX_VALUE : shop.getDistance());
         } else if ("price".equals(criteria.getSortBy())) {
-            comparator = comparator.thenComparing(shop -> shop.getAvgPrice() == null ? Long.MAX_VALUE : shop.getAvgPrice());
+            comparator = Comparator.comparing(shop -> shop.getAvgPrice() == null ? Long.MAX_VALUE : shop.getAvgPrice());
         } else {
-            comparator = comparator.thenComparing(
-                    RecommendationShopVo::getScore,
+            comparator = Comparator.comparing(
+                    RecommendationShopVo::getRankScore,
                     Comparator.nullsLast(Comparator.reverseOrder())
             );
         }
@@ -495,28 +661,29 @@ public class RecommendationAgentServiceImpl implements IRecommendationAgentServi
         RecommendationCriteria source = criteria == null ? new RecommendationCriteria() : criteria;
         RecommendationCriteria base = fallback == null ? new RecommendationCriteria() : fallback;
         RecommendationCriteria normalized = new RecommendationCriteria()
-                .setTypeId(firstNonNull(source.getTypeId(), base.getTypeId(), 2L))
-                .setTypeName(StrUtil.blankToDefault(source.getTypeName(), StrUtil.blankToDefault(base.getTypeName(), "KTV")))
+                .setTypeId(firstNonNull(source.getTypeId(), base.getTypeId(), null))
+                .setTypeName(StrUtil.blankToDefault(source.getTypeName(), base.getTypeName()))
                 .setPeopleCount(firstNonNull(source.getPeopleCount(), base.getPeopleCount(), 1))
                 .setBudgetMin(firstNonNull(source.getBudgetMin(), base.getBudgetMin(), null))
                 .setBudgetMax(firstNonNull(source.getBudgetMax(), base.getBudgetMax(), null))
+                .setBudgetPreference(StrUtil.blankToDefault(source.getBudgetPreference(), base.getBudgetPreference()))
                 .setPerCapitaBudgetMin(firstNonNull(source.getPerCapitaBudgetMin(), base.getPerCapitaBudgetMin(), null))
                 .setPerCapitaBudgetMax(firstNonNull(source.getPerCapitaBudgetMax(), base.getPerCapitaBudgetMax(), null))
+                .setDistanceLevel(StrUtil.blankToDefault(source.getDistanceLevel(), base.getDistanceLevel()))
                 .setRadiusMeters(firstNonNull(source.getRadiusMeters(), base.getRadiusMeters(), DEFAULT_RADIUS_METERS))
                 .setStartTime(StrUtil.blankToDefault(source.getStartTime(), base.getStartTime()))
                 .setEndTime(StrUtil.blankToDefault(source.getEndTime(), base.getEndTime()))
-                .setSortBy(StrUtil.blankToDefault(source.getSortBy(), StrUtil.blankToDefault(base.getSortBy(), "score")))
+                .setSortBy(StrUtil.blankToDefault(source.getSortBy(), StrUtil.blankToDefault(base.getSortBy(), "compositeScore")))
                 .setNeedLocation(firstNonNull(source.getNeedLocation(), base.getNeedLocation(), true));
 
         if (normalized.getPeopleCount() == null || normalized.getPeopleCount() <= 0) {
             normalized.setPeopleCount(1);
         }
-        if (normalized.getRadiusMeters() == null || normalized.getRadiusMeters() <= 0) {
-            normalized.setRadiusMeters(DEFAULT_RADIUS_METERS);
-        }
-        normalized.setRadiusMeters(Math.min(normalized.getRadiusMeters(), MAX_RADIUS_METERS));
+        normalizeShopType(normalized);
+        normalized.setRadiusMeters(normalizeRadiusLevel(normalized.getRadiusMeters()));
+        normalized.setDistanceLevel(normalized.getRadiusMeters() / 1000 + "km");
         if (!ALLOWED_SORTS.contains(normalized.getSortBy())) {
-            normalized.setSortBy("score");
+            normalized.setSortBy("compositeScore");
         }
         if (normalized.getBudgetMin() != null && normalized.getBudgetMax() != null
                 && normalized.getBudgetMin() > normalized.getBudgetMax()) {
@@ -526,6 +693,47 @@ public class RecommendationAgentServiceImpl implements IRecommendationAgentServi
         }
         resolvePerCapitaBudget(normalized);
         return normalized;
+    }
+
+    private void normalizeShopType(RecommendationCriteria criteria) {
+        if (criteria.getTypeId() != null) {
+            ShopType type = shopTypeService.getById(criteria.getTypeId());
+            if (type != null) {
+                if (StrUtil.isBlank(criteria.getTypeName())) {
+                    criteria.setTypeName(type.getName());
+                }
+                return;
+            }
+        }
+        if (StrUtil.isBlank(criteria.getTypeName())) {
+            criteria.setTypeId(null);
+            return;
+        }
+        for (ShopType type : shopTypeService.list()) {
+            if (type.getName() != null && (type.getName().contains(criteria.getTypeName())
+                    || criteria.getTypeName().contains(type.getName()))) {
+                criteria.setTypeId(type.getId());
+                criteria.setTypeName(type.getName());
+                return;
+            }
+        }
+        criteria.setTypeId(null);
+    }
+
+    private int normalizeRadiusLevel(Integer radiusMeters) {
+        if (radiusMeters == null || radiusMeters <= 0) {
+            return DEFAULT_RADIUS_METERS;
+        }
+        if (ALLOWED_RADIUS_METERS.contains(radiusMeters)) {
+            return radiusMeters;
+        }
+        if (radiusMeters <= 3000) {
+            return 3000;
+        }
+        if (radiusMeters <= 5000) {
+            return 5000;
+        }
+        return 10000;
     }
 
     @SafeVarargs
@@ -681,8 +889,10 @@ public class RecommendationAgentServiceImpl implements IRecommendationAgentServi
                 .setPeopleCount(criteria.getPeopleCount())
                 .setBudgetMin(criteria.getBudgetMin())
                 .setBudgetMax(criteria.getBudgetMax())
+                .setBudgetPreference(criteria.getBudgetPreference())
                 .setPerCapitaBudgetMin(criteria.getPerCapitaBudgetMin())
                 .setPerCapitaBudgetMax(criteria.getPerCapitaBudgetMax())
+                .setDistanceLevel(criteria.getDistanceLevel())
                 .setRadiusMeters(criteria.getRadiusMeters())
                 .setStartTime(criteria.getStartTime())
                 .setEndTime(criteria.getEndTime())
@@ -722,6 +932,57 @@ public class RecommendationAgentServiceImpl implements IRecommendationAgentServi
         return earthRadius * c;
     }
 
+    private boolean matchOpenHours(Shop shop, RecommendationCriteria criteria) {
+        if (StrUtil.isBlank(criteria.getStartTime()) && StrUtil.isBlank(criteria.getEndTime())) {
+            return true;
+        }
+        if (StrUtil.isBlank(shop.getOpenHours()) || !shop.getOpenHours().contains("-")) {
+            return false;
+        }
+        try {
+            String[] parts = shop.getOpenHours().trim().split("-");
+            if (parts.length < 2) {
+                return false;
+            }
+            LocalTime openStart = LocalTime.parse(parts[0].trim());
+            LocalTime openEnd = LocalTime.parse(parts[1].trim());
+            LocalTime userStart = StrUtil.isBlank(criteria.getStartTime()) ? openStart : LocalTime.parse(criteria.getStartTime());
+            LocalTime userEnd = StrUtil.isBlank(criteria.getEndTime()) ? userStart : LocalTime.parse(criteria.getEndTime());
+            if (openEnd.isBefore(openStart)) {
+                return !userStart.isBefore(openStart) || !userEnd.isAfter(openEnd);
+            }
+            return !openStart.isAfter(userStart) && !openEnd.isBefore(userEnd);
+        } catch (RuntimeException e) {
+            return false;
+        }
+    }
+
+    private double calculateCompositeScore(Shop shop, int maxSold) {
+        double scoreNorm = shop.getScore() == null ? 0 : Math.min(shop.getScore() / 50.0, 1.0);
+        double soldNorm = shop.getSold() == null || maxSold <= 0
+                ? 0
+                : Math.log1p(shop.getSold()) / Math.log1p(maxSold);
+        return 0.45 * scoreNorm + 0.55 * soldNorm + 0.20 * scoreNorm * soldNorm;
+    }
+
+    private double calculateRankScore(double compositeScore,
+                                      Double distance,
+                                      RecommendationCriteria criteria,
+                                      Long estimatedTotalPrice) {
+        double distanceScore = distance == null || criteria.getRadiusMeters() == null
+                ? 0
+                : 1 - Math.min(distance / criteria.getRadiusMeters(), 1);
+        double budgetScore = 1;
+        if ((criteria.getBudgetMin() != null || criteria.getBudgetMax() != null) && estimatedTotalPrice == null) {
+            budgetScore = 0;
+        }
+        return compositeScore * 0.70 + distanceScore * 0.20 + budgetScore * 0.10;
+    }
+
+    private double round4(double value) {
+        return BigDecimal.valueOf(value).setScale(4, RoundingMode.HALF_UP).doubleValue();
+    }
+
     private void resolvePerCapitaBudget(RecommendationCriteria criteria) {
         int peopleCount = criteria.getPeopleCount() == null || criteria.getPeopleCount() <= 0
                 ? 1
@@ -741,8 +1002,55 @@ public class RecommendationAgentServiceImpl implements IRecommendationAgentServi
         String key = CHAT_KEY_PREFIX + userId + ":" + sessionId;
         stringRedisTemplate.opsForValue().set(key, JSON.toJSONString(new ChatSnapshot(request, response)),
                 CHAT_TTL_HOURS, TimeUnit.HOURS);
+        if (response != null && response.getCriteria() != null) {
+            stringRedisTemplate.opsForValue().set(sessionCriteriaKey(sessionId), JSON.toJSONString(response.getCriteria()),
+                    CHAT_TTL_HOURS, TimeUnit.HOURS);
+        }
+    }
+
+    private RecommendationCriteria loadSessionCriteria(String sessionId) {
+        String json = stringRedisTemplate.opsForValue().get(sessionCriteriaKey(sessionId));
+        if (StrUtil.isBlank(json)) {
+            return null;
+        }
+        try {
+            RecommendationCriteriaVo vo = JSON.parseObject(json, RecommendationCriteriaVo.class);
+            return new RecommendationCriteria()
+                    .setTypeId(vo.getTypeId())
+                    .setTypeName(vo.getTypeName())
+                    .setPeopleCount(vo.getPeopleCount())
+                    .setBudgetMin(vo.getBudgetMin())
+                    .setBudgetMax(vo.getBudgetMax())
+                    .setBudgetPreference(vo.getBudgetPreference())
+                    .setPerCapitaBudgetMin(vo.getPerCapitaBudgetMin())
+                    .setPerCapitaBudgetMax(vo.getPerCapitaBudgetMax())
+                    .setDistanceLevel(vo.getDistanceLevel())
+                    .setRadiusMeters(vo.getRadiusMeters())
+                    .setStartTime(vo.getStartTime())
+                    .setEndTime(vo.getEndTime())
+                    .setSortBy(vo.getSortBy())
+                    .setNeedLocation(true);
+        } catch (RuntimeException e) {
+            log.warn("Load recommendation session criteria failed, sessionId={}", sessionId, e);
+            return null;
+        }
+    }
+
+    private String sessionCriteriaKey(String sessionId) {
+        return SESSION_CRITERIA_KEY_PREFIX + sessionId;
     }
 
     private record ChatSnapshot(RecommendationChatRequest request, RecommendationChatResponse response) {
     }
+
+    private record GeoRadiusResult(List<Long> shopIds, Map<Long, Double> distanceMap) {
+    }
+
+    public static class RecommendationWorkflowState extends AgentState {
+
+        public RecommendationWorkflowState(Map<String, Object> initData) {
+            super(initData);
+        }
+    }
 }
+

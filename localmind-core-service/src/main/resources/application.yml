@@ -1,11 +1,24 @@
 server:
   port: 8085
+
 spring:
   application:
     name: localmind-agent-platform
+  ai:
+    openai:
+      base-url: https://dashscope.aliyuncs.com/compatible-mode
+      api-key: ${DASHSCOPE_API_KEY:}
+      chat:
+        options:
+          model: ${AI_MODEL:qwen3.6-plus}
+          temperature: 0.2
+          max-tokens: 1200
+  autoconfigure:
+    exclude:
+      - org.springframework.ai.model.openai.autoconfigure.OpenAiAudioSpeechAutoConfiguration
+      - org.springframework.ai.model.openai.autoconfigure.OpenAiAudioTranscriptionAutoConfiguration
   main:
-    allow-bean-definition-overriding: true
-    allow-circular-references: true  
+    allow-circular-references: true
   datasource:
     driver-class-name: org.apache.shardingsphere.driver.ShardingSphereDriver
     url: jdbc:shardingsphere:classpath:shardingsphere.yaml
@@ -19,9 +32,9 @@ spring:
     pathmatch:
       matching-strategy: ant_path_matcher
     servlet:
-      load-on-startup: 1    
+      load-on-startup: 1
   jackson:
-    default-property-inclusion: non_null # JSON处理时忽略非空字段
+    default-property-inclusion: non_null
     time-zone: GMT+8
     date-format: yyyy-MM-dd HH:mm:ss
     generator:
@@ -37,30 +50,27 @@ spring:
         enable.idempotence: true
         max.in.flight.requests.per.connection: 5
     consumer:
-      #默认的消费组ID
       group-id: create_voucher_order
-      #是否自动提交offset
       enable-auto-commit: false
-      # 当kafka中没有初始offset或offset超出范围时将自动重置offset
-      # earliest:重置为分区中最小的offset;
-      # latest:重置为分区中最新的offset(消费分区中新产生的数据);
-      # none:只要有一个分区不存在已提交的offset,就抛出异常;
       auto-offset-reset: latest
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
     listener:
       ack-mode: manual_immediate
+
 mybatis-plus:
-  type-aliases-package: org.javaup.entity # 别名扫描包
+  type-aliases-package: org.javaup.entity
   configuration:
     log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
     local-cache-scope: statement
+
 logging:
   level:
     org.javaup: info
     AUDIT: INFO
   pattern:
     dateformat: mm:ss.SSS
+
 bloom-filter:
   filters:
     shop:
@@ -71,32 +81,24 @@ bloom-filter:
       name: voucher-id-bloom
       expected-insertions: 100000
       false-probability: 0.01
+
 localmind:
+  image-upload-dir: ./data/uploads/imgs/
   nearby:
-    # true: use real browser/client coordinates; false: use configured mock coordinates.
     real-coordinate-enabled: false
     mock-x: 120.149993
     mock-y: 30.334229
-  ai:
+  recommendation:
     enabled: true
-    base-url: https://dashscope.aliyuncs.com/compatible-mode
-    api-key: ${DASHSCOPE_API_KEY:}
-    timeout-ms: 5000
     max-message-chars: 500
     max-session-id-chars: 80
     max-candidates: 20
-    max-recommendation-size: 5
+    max-recommendation-size: 3
     max-context-chars: 6000
     max-vouchers-per-shop: 2
     fallback-enabled: true
-    json-schema-enabled: true
-    chat:
-      model: ${AI_MODEL:qwen3.6-plus}
-      temperature: 0.2
-      max-tokens: 1200
-    embedding:
-      model: text-embedding-v3
-      dimensions: 1024
+    json-schema-enabled: false
+    rule-matching-enabled: false
     circuit-breaker:
       key-prefix: agent:recommendation:llm:circuit
       failure-threshold: 3
@@ -107,6 +109,7 @@ localmind:
       key-prefix: agent:recommendation:rate
       window-seconds: 60
       max-requests: 20
+
 management:
   endpoints:
     web:
@@ -116,4 +119,3 @@ management:
     metrics:
       export:
         enabled: true
-      

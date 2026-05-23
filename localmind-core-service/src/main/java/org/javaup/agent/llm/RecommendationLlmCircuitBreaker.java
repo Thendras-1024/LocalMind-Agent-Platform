@@ -1,7 +1,7 @@
 package org.javaup.agent.llm;
 
 import lombok.extern.slf4j.Slf4j;
-import org.javaup.agent.config.LocalMindAiProperties;
+import org.javaup.agent.config.RecommendationAgentProperties;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
@@ -14,11 +14,11 @@ public class RecommendationLlmCircuitBreaker {
     private static final String OPEN_SUFFIX = ":open";
     private static final String FAILURE_SUFFIX = ":failures";
 
-    private final LocalMindAiProperties properties;
+    private final RecommendationAgentProperties properties;
 
     private final StringRedisTemplate stringRedisTemplate;
 
-    public RecommendationLlmCircuitBreaker(LocalMindAiProperties properties, StringRedisTemplate stringRedisTemplate) {
+    public RecommendationLlmCircuitBreaker(RecommendationAgentProperties properties, StringRedisTemplate stringRedisTemplate) {
         this.properties = properties;
         this.stringRedisTemplate = stringRedisTemplate;
     }

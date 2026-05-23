@@ -39,7 +39,7 @@ public class RuleBasedRecommendationIntentParser implements RecommendationIntent
         if (text.contains("美食") || text.contains("吃饭") || text.contains("餐厅")) {
             return 1L;
         }
-        return 2L;
+        return null;
     }
 
     private String resolveTypeName(String text) {
@@ -49,7 +49,7 @@ public class RuleBasedRecommendationIntentParser implements RecommendationIntent
         if (text.contains("美食") || text.contains("吃饭") || text.contains("餐厅")) {
             return "美食";
         }
-        return "KTV";
+        return null;
     }
 
     private Integer resolvePeopleCount(String text) {
@@ -83,7 +83,7 @@ public class RuleBasedRecommendationIntentParser implements RecommendationIntent
 
     private String resolveSortBy(String text) {
         if (text.contains("评分高") || text.contains("评价好") || text.contains("口碑好")) {
-            return "score";
+            return "compositeScore";
         }
         if (text.contains("距离近") || text.contains("最近")) {
             return "distance";
@@ -91,7 +91,7 @@ public class RuleBasedRecommendationIntentParser implements RecommendationIntent
         if (text.contains("便宜") || text.contains("实惠")) {
             return "price";
         }
-        return "score";
+        return "compositeScore";
     }
 
     private void resolveBudget(String text, RecommendationCriteria criteria) {

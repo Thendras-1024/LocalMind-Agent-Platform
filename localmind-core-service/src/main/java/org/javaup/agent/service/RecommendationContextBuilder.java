@@ -1,7 +1,7 @@
 package org.javaup.agent.service;
 
 import com.alibaba.fastjson.JSON;
-import org.javaup.agent.config.LocalMindAiProperties;
+import org.javaup.agent.config.RecommendationAgentProperties;
 import org.javaup.agent.model.LlmRecommendationCandidate;
 import org.javaup.agent.model.LlmRecommendationContext;
 import org.javaup.agent.model.RecommendationCriteria;
@@ -14,9 +14,9 @@ import java.util.List;
 @Component
 public class RecommendationContextBuilder {
 
-    private final LocalMindAiProperties properties;
+    private final RecommendationAgentProperties properties;
 
-    public RecommendationContextBuilder(LocalMindAiProperties properties) {
+    public RecommendationContextBuilder(RecommendationAgentProperties properties) {
         this.properties = properties;
     }
 
@@ -46,18 +46,16 @@ public class RecommendationContextBuilder {
     }
 
     private Comparator<LlmRecommendationCandidate> buildComparator(RecommendationCriteria criteria) {
-        Comparator<LlmRecommendationCandidate> comparator = Comparator
-                .comparing((LlmRecommendationCandidate item) -> Boolean.TRUE.equals(item.getShop().getHasHistoryOrder()))
-                .reversed();
+        Comparator<LlmRecommendationCandidate> comparator;
         if ("distance".equals(criteria.getSortBy())) {
-            comparator = comparator.thenComparing(item -> item.getShop().getDistance() == null
+            comparator = Comparator.comparing(item -> item.getShop().getDistance() == null
                     ? Double.MAX_VALUE : item.getShop().getDistance());
         } else if ("price".equals(criteria.getSortBy())) {
-            comparator = comparator.thenComparing(item -> item.getShop().getAvgPrice() == null
+            comparator = Comparator.comparing(item -> item.getShop().getAvgPrice() == null
                     ? Long.MAX_VALUE : item.getShop().getAvgPrice());
         } else {
-            comparator = comparator.thenComparing(
-                    item -> item.getShop().getScore(),
+            comparator = Comparator.comparing(
+                    item -> item.getShop().getRankScore(),
                     Comparator.nullsLast(Comparator.reverseOrder())
             );
         }

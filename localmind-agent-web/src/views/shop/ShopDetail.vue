@@ -357,7 +357,7 @@ onMounted(() => {
           disabled
           :max="5"
           :value="shop.score / 10"
-          text-color="#F63"
+          text-color="#ff6b35"
           show-score
         />
         <span>{{ shop.comments }}条</span>
@@ -548,28 +548,34 @@ onMounted(() => {
 
     <div class="shop-divider"></div>
 
-    <div class="copyright">copyright ©2021 hmdp.com</div>
+    <div class="copyright">copyright ©2026 LocalMind</div>
   </div>
 </template>
 
 <style scoped>
 .shop-detail-container {
   min-height: 100vh;
-  background-color: #f5f5f5;
+  color: var(--lm-text);
+  background: var(--lm-bg);
 }
 
 .header {
   display: flex;
   align-items: center;
-  padding: 10px;
-  background-color: #fff;
+  min-height: var(--lm-header-height);
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.92);
+  border-bottom: 1px solid var(--lm-line);
   position: sticky;
   top: 0;
   z-index: 100;
+  backdrop-filter: blur(14px);
 }
 
 .header-back-btn {
-  padding: 5px;
+  width: 38px;
+  color: var(--lm-primary);
+  font-size: 21px;
   cursor: pointer;
 }
 
@@ -581,18 +587,22 @@ onMounted(() => {
 }
 
 .header-share {
-  padding: 5px;
+  width: 38px;
+  color: var(--lm-muted);
+  text-align: right;
   cursor: pointer;
 }
 
 .shop-info-box {
-  padding: 15px;
-  background-color: #fff;
+  padding: 16px 14px 14px;
+  background: var(--lm-surface);
+  border-radius: 0 0 22px 22px;
+  box-shadow: var(--lm-shadow-soft);
 }
 
 .shop-title {
-  font-size: 18px;
-  font-weight: bold;
+  font-size: 22px;
+  font-weight: 900;
   margin-bottom: 10px;
 }
 
@@ -604,7 +614,7 @@ onMounted(() => {
 }
 
 .shop-rate-info {
-  color: #666;
+  color: var(--lm-text-soft);
   font-size: 14px;
   margin-bottom: 10px;
 }
@@ -613,40 +623,47 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-bottom: 10px;
+  margin-bottom: 12px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: #fff7ed;
 }
 
 .shop-images {
   display: flex;
   gap: 10px;
-  margin-bottom: 10px;
+  margin-bottom: 12px;
   overflow-x: auto;
 }
 
 .shop-images img {
-  width: 100px;
+  width: 122px;
   height: 100px;
   object-fit: cover;
-  border-radius: 4px;
+  border-radius: 14px;
 }
 
 .shop-address {
   display: flex;
   align-items: center;
-  color: #666;
+  color: var(--lm-text-soft);
   font-size: 14px;
+  line-height: 1.5;
 }
 
 .shop-divider {
   height: 10px;
-  background-color: #f5f5f5;
+  background: transparent;
 }
 
 .shop-open-time {
   display: flex;
   align-items: center;
-  padding: 15px;
-  background-color: #fff;
+  margin: 0 12px;
+  padding: 14px;
+  background: var(--lm-surface);
+  border-radius: var(--lm-radius);
+  box-shadow: var(--lm-shadow-soft);
 }
 
 .shop-open-time > div {
@@ -655,34 +672,37 @@ onMounted(() => {
 
 .line-right {
   margin-left: auto;
-  color: #666;
+  color: var(--lm-muted);
   display: flex;
   align-items: center;
   gap: 5px;
 }
 
 .shop-voucher {
-  padding: 15px;
-  background-color: #fff;
+  margin: 0 12px;
+  padding: 14px;
+  background: var(--lm-surface);
+  border-radius: var(--lm-radius);
+  box-shadow: var(--lm-shadow-soft);
 }
 
 .voucher-icon {
-  background-color: #f63;
+  background: linear-gradient(135deg, var(--lm-primary), #ff9961);
   color: #fff;
-  padding: 2px 5px;
-  border-radius: 2px;
+  padding: 3px 6px;
+  border-radius: 8px;
   margin-right: 5px;
 }
 
 .voucher-box {
   display: flex;
   margin-top: 10px;
-  background-color: #fff;
-  border: 1px solid #eee;
-  border-radius: 10px;
+  background: linear-gradient(135deg, #fffaf6, #fff);
+  border: 1px solid var(--lm-line);
+  border-radius: 16px;
   position: relative;
   overflow: hidden;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  box-shadow: var(--lm-shadow-soft);
   padding: 12px 12px 12px 16px;
 }
 
@@ -700,30 +720,30 @@ onMounted(() => {
 .voucher-b {
   width: 10px;
   height: 10px;
-  background-color: #f5f5f5;
+  background-color: var(--lm-bg);
   border-radius: 50%;
 }
 
 .voucher-left {
   flex: 1;
   padding: 10px;
-  border-right: 1px solid #f0f0f0;
+  border-right: 1px dashed var(--lm-line);
 }
 
 .voucher-title {
   font-size: 16px;
-  font-weight: bold;
+  font-weight: 800;
   margin-bottom: 5px;
 }
 
 .voucher-subtitle {
-  color: #666;
+  color: var(--lm-text-soft);
   font-size: 14px;
   margin-bottom: 5px;
 }
 
 .voucher-price {
-  color: #f63;
+  color: var(--lm-primary);
   font-size: 16px;
   display: flex;
   align-items: baseline;
@@ -737,15 +757,15 @@ onMounted(() => {
 }
 .voucher-price span {
   font-size: 14px;
-  color: #ff6d6d;
+  color: var(--lm-primary-deep);
   padding: 0 6px;
   line-height: 18px;
   border-radius: 9px;
-  background-color: #fff2f0;
+  background-color: var(--lm-primary-soft);
 }
 
 .voucher-right {
-  flex: 0 0 220px;
+  flex: 0 0 118px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -755,7 +775,7 @@ onMounted(() => {
 
 .voucher-btn {
   width: 100%;
-  max-width: 240px;
+  max-width: 118px;
   height: 40px;
   line-height: 40px;
   border: none;
@@ -765,8 +785,8 @@ onMounted(() => {
   font-weight: 600;
   letter-spacing: 0.5px;
   color: #fff;
-  background: linear-gradient(135deg, #ff7a45 0%, #ff4d4f 100%);
-  box-shadow: 0 6px 14px rgba(255, 77, 79, 0.25);
+  background: linear-gradient(135deg, var(--lm-primary) 0%, #ff8f57 100%);
+  box-shadow: 0 8px 16px rgba(255, 107, 53, 0.24);
 }
 
 .disable-btn {
@@ -786,7 +806,7 @@ onMounted(() => {
 
 .seckill-stock {
   font-size: 12px;
-  color: #8a8a8a;
+  color: var(--lm-muted);
   margin-top: 4px;
 }
 .seckill-stock span {
@@ -794,14 +814,14 @@ onMounted(() => {
   padding: 0 6px;
   line-height: 18px;
   border-radius: 9px;
-  background-color: #fff5f0;
-  color: #ff4d4f;
+  background-color: var(--lm-primary-soft);
+  color: var(--lm-primary-deep);
   margin: 0 2px;
 }
 
 .seckill-time {
   font-size: 12px;
-  color: #8a8a8a;
+  color: var(--lm-muted);
 }
 
 .seckill-status {
@@ -817,8 +837,8 @@ onMounted(() => {
   padding: 2px 8px;
   line-height: 20px;
   border-radius: 10px;
-  background-color: #fff2f0;
-  color: #ff4d4f;
+  background-color: var(--lm-primary-soft);
+  color: var(--lm-primary-deep);
   font-weight: 600;
 }
 .cancel-link {
@@ -826,8 +846,8 @@ onMounted(() => {
   padding: 4px 12px;
   line-height: 20px;
   border-radius: 12px;
-  border: 1px solid #409eff;
-  background-color: #409eff;
+  border: 1px solid var(--lm-ai);
+  background-color: var(--lm-ai);
   color: #fff;
   font-size: 14px;
   cursor: pointer;
@@ -854,8 +874,8 @@ onMounted(() => {
   padding: 2px 8px;
   line-height: 20px;
   border-radius: 10px;
-  background-color: #e6f4ff;
-  color: #1677ff;
+  background-color: var(--lm-ai-soft);
+  color: #087d73;
   font-weight: 600;
 }
 .subscribe-link {
@@ -863,8 +883,8 @@ onMounted(() => {
   padding: 4px 12px;
   line-height: 20px;
   border-radius: 12px;
-  border: 1px solid #ffa940;
-  background-color: #ffa940;
+  border: 1px solid #ffb26d;
+  background-color: #ffb26d;
   color: #fff;
   cursor: pointer;
 }
@@ -895,7 +915,7 @@ onMounted(() => {
 .cancel-subscribe,
 .subscribed-tag {
   display: inline-block;
-  width: 180px;
+  width: 104px;
   height: 36px;
   line-height: 36px;
   border-radius: 18px;
@@ -905,8 +925,11 @@ onMounted(() => {
 }
 
 .shop-comments {
-  padding: 15px;
-  background-color: #fff;
+  margin: 0 12px;
+  padding: 14px;
+  background: var(--lm-surface);
+  border-radius: var(--lm-radius);
+  box-shadow: var(--lm-shadow-soft);
 }
 
 .comments-head {
@@ -925,7 +948,7 @@ onMounted(() => {
 
 .tag {
   padding: 5px 10px;
-  background-color: #f5f5f5;
+  background-color: #fff7ed;
   border-radius: 15px;
   font-size: 14px;
 }
@@ -947,7 +970,7 @@ onMounted(() => {
 }
 
 .comment-user span {
-  color: #666;
+  color: var(--lm-muted);
   font-size: 12px;
   margin-left: 5px;
 }
@@ -962,7 +985,7 @@ onMounted(() => {
   width: 80px;
   height: 80px;
   object-fit: cover;
-  border-radius: 4px;
+  border-radius: 12px;
 }
 
 .copyright {

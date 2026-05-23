@@ -3,9 +3,13 @@ package org.javaup.agent.vo;
 import lombok.Data;
 import lombok.experimental.Accessors;
 
+import java.io.Serializable;
+
 @Data
 @Accessors(chain = true)
-public class RecommendationCriteriaVo {
+public class RecommendationCriteriaVo implements Serializable {
+
+    private static final long serialVersionUID = 1L;
 
     private Long typeId;
 
@@ -17,9 +21,13 @@ public class RecommendationCriteriaVo {
 
     private Long budgetMax;
 
+    private String budgetPreference;
+
     private Long perCapitaBudgetMin;
 
     private Long perCapitaBudgetMax;
+
+    private String distanceLevel;
 
     private Integer radiusMeters;
 

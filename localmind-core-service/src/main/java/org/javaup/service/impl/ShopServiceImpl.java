@@ -20,13 +20,14 @@ import org.javaup.util.ServiceLockTool;
 import org.javaup.utils.CacheClient;
 import org.javaup.utils.SystemConstants;
 import org.redisson.api.RLock;
+import org.springframework.data.geo.Circle;
 import org.springframework.data.geo.Distance;
 import org.springframework.data.geo.GeoResult;
 import org.springframework.data.geo.GeoResults;
+import org.springframework.data.geo.Metrics;
 import org.springframework.data.geo.Point;
 import org.springframework.data.redis.connection.RedisGeoCommands;
 import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.data.redis.domain.geo.GeoReference;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -289,6 +290,15 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
      */
     @Override
     public Result queryShopByType(Integer typeId, Integer current, Double x, Double y) {
+        return queryShopByGeo(typeId, current, x, y, 5000);
+    }
+
+    @Override
+    public Result queryNearbyShops(Integer typeId, Integer current, Double x, Double y, Integer radius) {
+        return queryShopByGeo(typeId, current, x, y, normalizeRadius(radius));
+    }
+
+    private Result queryShopByGeo(Integer typeId, Integer current, Double x, Double y, int radiusMeters) {
         if (!Boolean.TRUE.equals(nearbyLocationProperties.getRealCoordinateEnabled())) {
             x = nearbyLocationProperties.getMockX();
             y = nearbyLocationProperties.getMockY();
@@ -309,14 +319,16 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
         int from = (current - 1) * SystemConstants.DEFAULT_PAGE_SIZE;
         int end = current * SystemConstants.DEFAULT_PAGE_SIZE;
 
-        // 1. 查询Redis GEO：获取5公里范围内的商铺，按距离排序
+        // 1. 查询Redis GEO：使用 GEORADIUS 兼容 Redis 5，获取指定半径内商铺并按距离排序
         String key = SHOP_GEO_KEY + typeId;
         GeoResults<RedisGeoCommands.GeoLocation<String>> results = stringRedisTemplate.opsForGeo()
-                .search(
+                .radius(
                         key,
-                        GeoReference.fromCoordinate(x, y),  // 圆心坐标
-                        new Distance(5000),                 // 半径5公里
-                        RedisGeoCommands.GeoSearchCommandArgs.newGeoSearchArgs().includeDistance().limit(end)
+                        new Circle(new Point(x, y), new Distance(radiusMeters / 1000.0, Metrics.KILOMETERS)),
+                        RedisGeoCommands.GeoRadiusCommandArgs.newGeoRadiusArgs()
+                                .includeDistance()
+                                .sortAscending()
+                                .limit(end)
                 );
 
         // 2. 解析结果
@@ -353,5 +365,15 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
 
         // 6. 返回结果
         return Result.ok(shops);
+    }
+
+    private int normalizeRadius(Integer radius) {
+        if (radius == null || radius <= 0) {
+            return 5000;
+        }
+        if (radius <= 10) {
+            return radius * 1000;
+        }
+        return Math.min(radius, 10000);
     }
 }

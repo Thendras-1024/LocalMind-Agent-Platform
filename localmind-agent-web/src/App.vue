@@ -6,4 +6,6 @@
   </div>
 </template>
 
-<style scoped></style>
+<style>
+@import '@/assets/css/main.css';
+</style>

@@ -484,22 +484,25 @@ const go = (index) => {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  color: var(--lm-text);
+  background: var(--lm-bg);
 }
 
 .header {
   position: relative;
-  height: 44px;
+  min-height: var(--lm-header-height);
   display: flex;
   align-items: center;
   padding: 0 15px;
-  background: #fff;
-  border-bottom: 1px solid #f1f1f1;
+  background: rgba(255, 255, 255, 0.92);
+  border-bottom: 1px solid var(--lm-line);
   flex-shrink: 0;
+  backdrop-filter: blur(14px);
 }
 
 .header-back-btn {
   font-size: 20px;
-  color: #333;
+  color: var(--lm-primary);
 }
 
 .header-title {
@@ -511,7 +514,7 @@ const go = (index) => {
 
 .header-share {
   font-size: 20px;
-  color: #333;
+  color: var(--lm-muted);
 }
 
 .content {
@@ -524,7 +527,7 @@ const go = (index) => {
 .blog-info-box {
   position: relative;
   width: 100%;
-  height: 300px;
+  height: 320px;
   overflow: hidden;
 }
 
@@ -542,10 +545,15 @@ const go = (index) => {
 }
 
 .basic {
-  padding: 15px;
+  margin: -18px 12px 0;
+  padding: 14px;
   display: flex;
   align-items: center;
-  background: #fff;
+  position: relative;
+  z-index: 2;
+  background: rgba(255, 255, 255, 0.96);
+  border-radius: var(--lm-radius);
+  box-shadow: var(--lm-shadow);
 }
 
 .basic-icon {
@@ -568,42 +576,49 @@ const go = (index) => {
 
 .basic-info .name {
   font-size: 16px;
-  font-weight: bold;
+  font-weight: 800;
   margin-bottom: 5px;
 }
 
 .basic-info .time {
   font-size: 12px;
-  color: #999;
+  color: var(--lm-muted);
 }
 
 .logout-btn {
-  padding: 5px 10px;
-  border: 1px solid #ff6633;
-  color: #ff6633;
-  border-radius: 15px;
+  padding: 6px 10px;
+  border: 1px solid var(--lm-primary);
+  color: var(--lm-primary);
+  border-radius: 999px;
   font-size: 12px;
+  font-weight: 800;
   text-align: center;
 }
 
 .blog-text {
+  margin: 12px;
   padding: 15px;
-  background: #fff;
-  margin-top: 10px;
+  background: var(--lm-surface);
+  border-radius: var(--lm-radius);
+  box-shadow: var(--lm-shadow-soft);
+  font-size: 15px;
+  line-height: 1.7;
 }
 
 .shop-basic {
-  padding: 15px;
+  margin: 12px;
+  padding: 14px;
   display: flex;
   align-items: center;
-  background: #fff;
-  margin-top: 10px;
+  background: var(--lm-surface);
+  border-radius: var(--lm-radius);
+  box-shadow: var(--lm-shadow-soft);
 }
 
 .shop-icon {
   width: 50px;
   height: 50px;
-  border-radius: 4px;
+  border-radius: 14px;
   overflow: hidden;
   margin-right: 10px;
 }
@@ -616,16 +631,18 @@ const go = (index) => {
 
 .shop-avg {
   font-size: 12px;
-  color: #666;
+  color: var(--lm-primary);
   margin-top: 5px;
 }
 
 .zan-box {
-  padding: 15px;
+  margin: 12px;
+  padding: 14px;
   display: flex;
   align-items: center;
-  background: #fff;
-  margin-top: 10px;
+  background: var(--lm-surface);
+  border-radius: var(--lm-radius);
+  box-shadow: var(--lm-shadow-soft);
 }
 
 .zan-list {
@@ -651,13 +668,15 @@ const go = (index) => {
 
 .blog-divider {
   height: 10px;
-  background: #f1f1f1;
-  margin-top: 10px;
+  background: transparent;
 }
 
 .blog-comments {
-  padding: 15px;
-  background: #fff;
+  margin: 0 12px 12px;
+  padding: 14px;
+  background: var(--lm-surface);
+  border-radius: var(--lm-radius);
+  box-shadow: var(--lm-shadow-soft);
 }
 
 .comments-head {
@@ -692,13 +711,13 @@ const go = (index) => {
 
 .comment-user {
   font-size: 14px;
-  font-weight: bold;
+  font-weight: 800;
   margin-bottom: 5px;
 }
 
 .comment-user span {
   font-size: 12px;
-  color: #999;
+  color: var(--lm-muted);
   margin-left: 5px;
 }
 
@@ -711,18 +730,20 @@ const go = (index) => {
 .comment-images img {
   width: 80px;
   height: 80px;
-  margin-right: 5px;
+  margin-right: 6px;
   margin-bottom: 5px;
   object-fit: cover;
+  border-radius: 12px;
 }
 
 .foot {
-  height: 50px;
+  height: 58px;
   display: flex;
   align-items: center;
-  background: #fff;
-  border-top: 1px solid #f1f1f1;
+  background: rgba(255, 255, 255, 0.94);
+  border-top: 1px solid var(--lm-line);
   flex-shrink: 0;
+  box-shadow: 0 -8px 24px rgba(53, 35, 25, 0.08);
 }
 
 .foot-box {
@@ -735,7 +756,7 @@ const go = (index) => {
 .foot-view {
   display: flex;
   align-items: center;
-  color: #82848a;
+  color: var(--lm-muted);
 }
 
 .foot-view span {
@@ -744,6 +765,6 @@ const go = (index) => {
 }
 
 .liked {
-  color: #ff6633;
+  color: var(--lm-primary);
 }
 </style>

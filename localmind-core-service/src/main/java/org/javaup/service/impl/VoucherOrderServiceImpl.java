@@ -275,8 +275,6 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
 
     private void handleVoucherOrder(VoucherOrder voucherOrder) {
         Long userId = voucherOrder.getId();
-        // 创建锁对象
-        // SimpleRedisLock lock = new SimpleRedisLock("order:" + userId, stringRedisTemplate);
         RLock lock = redissonClient.getLock("lock:order:" + userId);
         // 获取锁
         boolean isLock = lock.tryLock();

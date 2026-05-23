@@ -162,41 +162,46 @@ const goBack = () => {
   display: flex;
   flex-direction: column;
   height: 100vh;
-  background-color: #f5f5f5;
+  color: var(--lm-text);
+  background: var(--lm-bg);
 }
 
 .header {
   position: relative;
-  height: 44px;
+  min-height: var(--lm-header-height);
   display: flex;
   align-items: center;
   padding: 0 15px;
-  background: #fff;
-  border-bottom: 1px solid #f1f1f1;
+  background: rgba(255, 255, 255, 0.92);
+  border-bottom: 1px solid var(--lm-line);
   flex-shrink: 0;
+  backdrop-filter: blur(14px);
 }
 
 .header-back-btn {
-  font-size: 16px;
-  color: #333;
+  font-size: 20px;
+  color: var(--lm-primary);
 }
 
 .header-title {
   flex: 1;
   text-align: center;
   font-size: 16px;
-  font-weight: bold;
+  font-weight: 800;
 }
 
 .edit-container {
   flex: 1;
   overflow-y: auto;
-  padding: 10px 0;
+  padding: 12px;
 }
 
 .info-box {
-  background: #fff;
-  margin-bottom: 10px;
+  background: var(--lm-surface);
+  margin-bottom: 12px;
+  border-radius: var(--lm-radius);
+  box-shadow: var(--lm-shadow-soft);
+  overflow: hidden;
 }
 
 .info-item {
@@ -208,13 +213,14 @@ const goBack = () => {
 
 .info-label {
   font-size: 16px;
-  color: #333;
+  color: var(--lm-text);
+  font-weight: 700;
 }
 
 .info-btn {
   display: flex;
   align-items: center;
-  color: #999;
+  color: var(--lm-muted);
 }
 
 .info-btn img {
@@ -224,12 +230,12 @@ const goBack = () => {
 
 .divider {
   height: 1px;
-  background: #f1f1f1;
+  background: var(--lm-line);
   margin: 0 15px;
 }
 
 a {
-  color: #ff6633;
+  color: var(--lm-primary);
   text-decoration: none;
 }
 </style>

@@ -82,7 +82,10 @@ nbdist/
 *.bak
 *.orig
 
+# Runtime uploaded files
+data/uploads/
+
 # Project-local assistant / scratch files
 .claude/
 1.txt
-
+test.jpg

@@ -2,6 +2,7 @@ package org.javaup.service;
 
 import org.javaup.entity.BlogComments;
 import com.baomidou.mybatisplus.extension.service.IService;
+import org.javaup.dto.Result;
 
 /**
  * @program: 智邻生活 Agent 平台
@@ -10,4 +11,7 @@ import com.baomidou.mybatisplus.extension.service.IService;
  **/
 public interface IBlogCommentsService extends IService<BlogComments> {
 
+    Result queryCommentsByBlogId(Long blogId, Integer current);
+
+    Result saveComment(BlogComments comment);
 }

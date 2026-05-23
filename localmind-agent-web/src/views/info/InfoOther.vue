@@ -216,38 +216,42 @@ const toOtherInfo = (id) => {
   display: flex;
   flex-direction: column;
   height: 100vh;
-  background-color: #f5f5f5;
+  color: var(--lm-text);
+  background: var(--lm-bg);
 }
 
 .header {
   position: relative;
-  height: 44px;
+  min-height: var(--lm-header-height);
   display: flex;
   align-items: center;
   padding: 0 15px;
-  background: #fff;
-  border-bottom: 1px solid #f1f1f1;
+  background: rgba(255, 255, 255, 0.92);
+  border-bottom: 1px solid var(--lm-line);
   flex-shrink: 0;
+  backdrop-filter: blur(14px);
 }
 
 .header-back-btn {
-  font-size: 16px;
-  color: #333;
+  font-size: 20px;
+  color: var(--lm-primary);
 }
 
 .header-title {
   flex: 1;
   text-align: center;
   font-size: 16px;
-  font-weight: bold;
+  font-weight: 800;
 }
 
 .basic {
   display: flex;
   align-items: center;
-  padding: 15px;
-  background: #fff;
-  margin-bottom: 10px;
+  margin: 12px;
+  padding: 16px;
+  background: var(--lm-surface);
+  border-radius: var(--lm-radius);
+  box-shadow: var(--lm-shadow-soft);
 }
 
 .basic-icon {
@@ -270,43 +274,49 @@ const toOtherInfo = (id) => {
 
 .basic-info .name {
   font-size: 18px;
-  font-weight: bold;
+  font-weight: 900;
   margin-bottom: 5px;
 }
 
 .basic-info span {
   font-size: 14px;
-  color: #999;
+  color: var(--lm-muted);
 }
 
 .logout-btn {
   width: 80px;
   height: 30px;
   line-height: 30px;
-  background: #ff6633;
+  background: linear-gradient(135deg, var(--lm-primary), #ff8f57);
   color: #fff;
-  border-radius: 15px;
+  border-radius: 999px;
   font-size: 14px;
+  font-weight: 800;
 }
 
 .introduce {
-  padding: 15px;
-  background: #fff;
-  margin-bottom: 10px;
+  margin: 0 12px 12px;
+  padding: 14px;
+  background: var(--lm-surface);
+  border-radius: var(--lm-radius);
+  box-shadow: var(--lm-shadow-soft);
   font-size: 14px;
-  color: #666;
+  color: var(--lm-text-soft);
 }
 
 .content {
   flex: 1;
   overflow-y: auto;
-  background: #fff;
+  margin: 0 12px 12px;
+  background: var(--lm-surface);
+  border-radius: var(--lm-radius);
+  box-shadow: var(--lm-shadow-soft);
 }
 
 .blog-item {
   display: flex;
   padding: 15px;
-  border-bottom: 1px solid #f1f1f1;
+  border-bottom: 1px solid var(--lm-line);
 }
 
 .blog-img {
@@ -314,6 +324,7 @@ const toOtherInfo = (id) => {
   height: 100px;
   margin-right: 15px;
   overflow: hidden;
+  border-radius: 14px;
 }
 
 .blog-img img {
@@ -331,7 +342,7 @@ const toOtherInfo = (id) => {
 
 .blog-title {
   font-size: 16px;
-  font-weight: bold;
+  font-weight: 800;
   margin-bottom: 10px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -345,7 +356,7 @@ const toOtherInfo = (id) => {
   display: flex;
   align-items: center;
   font-size: 14px;
-  color: #999;
+  color: var(--lm-muted);
 }
 
 .blog-liked img {
@@ -362,7 +373,7 @@ const toOtherInfo = (id) => {
   display: flex;
   align-items: center;
   padding: 15px;
-  border-bottom: 1px solid #f1f1f1;
+  border-bottom: 1px solid var(--lm-line);
 }
 
 .follow-info-icon {
@@ -385,16 +396,16 @@ const toOtherInfo = (id) => {
 
 .follow-info-name .name {
   font-size: 16px;
-  font-weight: bold;
+  font-weight: 800;
 }
 
 .follow-info-btn {
   width: 80px;
   height: 30px;
   line-height: 30px;
-  background: #ff6633;
+  background: var(--lm-primary);
   color: #fff;
-  border-radius: 15px;
+  border-radius: 999px;
   font-size: 14px;
   text-align: center;
 }

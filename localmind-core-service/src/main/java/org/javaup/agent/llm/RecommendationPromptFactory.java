@@ -29,12 +29,14 @@ public class RecommendationPromptFactory {
                     "peopleCount": 4,
                     "budgetMin": null,
                     "budgetMax": 300,
+                    "budgetPreference": null,
                     "perCapitaBudgetMin": null,
                     "perCapitaBudgetMax": 75,
+                    "distanceLevel": "3km",
                     "radiusMeters": 3000,
                     "startTime": null,
                     "endTime": null,
-                    "sortBy": "score",
+                    "sortBy": "compositeScore",
                     "needLocation": true
                   },
                   "missingFields": []
@@ -42,8 +44,8 @@ public class RecommendationPromptFactory {
                 约束:
                 - typeId 必须优先从可用门店类型中选择；无法确定时选择最相近类型，仍需给出 typeName。
                 - peopleCount 缺失时填 1。
-                - radiusMeters 缺失时填 5000，最大不超过 20000。
-                - sortBy 只能是 score、distance、price。
+                - distanceLevel/radiusMeters 只能归一化为 3km/3000、5km/5000、10km/10000；用户未提距离时默认 5000。
+                - sortBy 只能是 compositeScore、distance、price；用户表达评分高、口碑好、人气高时使用 compositeScore。
                 - 金额是总预算；如果用户表达的是人均预算，要换算到 perCapitaBudget，并按人数换算总预算。
                 - needLocation 通常为 true。
                 """;
@@ -119,15 +121,17 @@ public class RecommendationPromptFactory {
                                         "peopleCount":{"type":["integer","null"]},
                                         "budgetMin":{"type":["integer","null"]},
                                         "budgetMax":{"type":["integer","null"]},
+                                        "budgetPreference":{"type":["string","null"]},
                                         "perCapitaBudgetMin":{"type":["integer","null"]},
                                         "perCapitaBudgetMax":{"type":["integer","null"]},
+                                        "distanceLevel":{"type":["string","null"]},
                                         "radiusMeters":{"type":["integer","null"]},
                                         "startTime":{"type":["string","null"]},
                                         "endTime":{"type":["string","null"]},
                                         "sortBy":{"type":["string","null"]},
                                         "needLocation":{"type":["boolean","null"]}
                                       },
-                                      "required":["typeId","typeName","peopleCount","budgetMin","budgetMax","perCapitaBudgetMin","perCapitaBudgetMax","radiusMeters","startTime","endTime","sortBy","needLocation"],
+                                      "required":["typeId","typeName","peopleCount","budgetMin","budgetMax","budgetPreference","perCapitaBudgetMin","perCapitaBudgetMax","distanceLevel","radiusMeters","startTime","endTime","sortBy","needLocation"],
                                       "additionalProperties":false
                                     },
                                     "missingFields":{"type":"array","items":{"type":"string"}}
@@ -175,17 +179,12 @@ public class RecommendationPromptFactory {
         context.getCandidates().forEach(candidate -> {
             JSONObject item = new JSONObject(true);
             item.put("shopId", candidate.getShop().getShopId());
-            item.put("name", candidate.getShop().getName());
-            item.put("area", candidate.getShop().getArea());
-            item.put("address", candidate.getShop().getAddress());
-            item.put("score", candidate.getShop().getScore());
-            item.put("comments", candidate.getShop().getComments());
+            item.put("typeName", candidate.getShop().getTypeName());
+            item.put("compositeScore", candidate.getShop().getCompositeScore());
+            item.put("rankScore", candidate.getShop().getRankScore());
             item.put("avgPrice", candidate.getShop().getAvgPrice());
             item.put("distanceMeters", candidate.getShop().getDistance());
             item.put("estimatedTotalPrice", candidate.getShop().getEstimatedTotalPrice());
-            item.put("hasHistoryOrder", candidate.getShop().getHasHistoryOrder());
-            item.put("openHours", candidate.getOpenHours());
-            item.put("vouchers", candidate.getVouchers());
             array.add(item);
         });
         return array;

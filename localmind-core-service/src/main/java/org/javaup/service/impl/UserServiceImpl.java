@@ -121,6 +121,16 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
     }
 
     @Override
+    public Result<Void> logout(String token) {
+        if (cn.hutool.core.util.StrUtil.isBlank(token)) {
+            return Result.ok();
+        }
+        stringRedisTemplate.delete(LOGIN_USER_KEY + token);
+        UserHolder.removeUser();
+        return Result.ok();
+    }
+
+    @Override
     public Result<Void> sign() {
         Long userId = UserHolder.getUser().getId();
         LocalDateTime now = LocalDateTime.now();

@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="320" height="200" viewBox="0 0 320 200">
+  <rect width="320" height="200" fill="#f4f4f0"/>
+  <rect x="52" y="72" width="216" height="86" rx="10" fill="#d9ded1"/>
+  <path d="M70 72l24-38h132l24 38z" fill="#b9c2ad"/>
+  <circle cx="116" cy="112" r="18" fill="#f4f4f0"/>
+  <rect x="152" y="98" width="70" height="14" rx="7" fill="#f4f4f0"/>
+  <rect x="152" y="124" width="46" height="12" rx="6" fill="#f4f4f0"/>
+  <text x="160" y="181" text-anchor="middle" font-family="sans-serif" font-size="18" fill="#7c8870">LocalMind Shop</text>
+</svg>

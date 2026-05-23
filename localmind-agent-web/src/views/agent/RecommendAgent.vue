@@ -5,7 +5,7 @@
         <el-icon><ArrowLeft /></el-icon>
       </button>
       <div class="agent-title">
-        <div class="title-main">智能推荐导购</div>
+        <div class="title-main">LocalMind 智慧精灵</div>
         <div class="title-sub">{{ locationText }}</div>
       </div>
       <button class="icon-btn" @click="locate" aria-label="重新定位">
@@ -96,7 +96,7 @@ const messages = ref([
     id: Date.now(),
     role: 'assistant',
     content:
-      '你好，我是推荐小精灵。告诉我想去哪、几个人、预算、距离和时间，我来帮你筛店。'
+      '你好，我是 LocalMind 智慧精灵。告诉我想去哪、几个人、预算、距离和时间，我来帮你筛店。'
   }
 ])
 const quickPrompts = [
@@ -206,16 +206,21 @@ onMounted(() => {
   height: 100vh;
   display: flex;
   flex-direction: column;
-  background: #f6f7f9;
+  color: var(--lm-text);
+  background:
+    radial-gradient(circle at 18% 8%, rgba(21, 184, 166, 0.13), transparent 28%),
+    linear-gradient(180deg, #fff8f2 0%, #f7f4ef 100%);
 }
 
 .agent-header {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 12px;
+  padding: 13px 12px 14px;
   color: #fff;
-  background: #ff6633;
+  background:
+    linear-gradient(135deg, var(--lm-primary), #ff8f57 58%, #15b8a6);
+  box-shadow: 0 14px 28px rgba(255, 107, 53, 0.22);
 }
 
 .icon-btn,
@@ -223,7 +228,7 @@ onMounted(() => {
   width: 38px;
   height: 38px;
   border: 0;
-  border-radius: 50%;
+  border-radius: 14px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -232,7 +237,8 @@ onMounted(() => {
 
 .icon-btn {
   color: #fff;
-  background: rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(8px);
 }
 
 .agent-title {
@@ -242,7 +248,7 @@ onMounted(() => {
 
 .title-main {
   font-size: 17px;
-  font-weight: 700;
+  font-weight: 800;
 }
 
 .title-sub {
@@ -254,12 +260,12 @@ onMounted(() => {
 .agent-body {
   flex: 1;
   overflow-y: auto;
-  padding: 14px 12px;
+  padding: 16px 12px;
 }
 
 .message-row {
   display: flex;
-  margin-bottom: 10px;
+  margin-bottom: 12px;
 }
 
 .message-row.user {
@@ -267,45 +273,53 @@ onMounted(() => {
 }
 
 .message-bubble {
-  max-width: 78%;
-  padding: 10px 12px;
-  border-radius: 8px;
+  max-width: 82%;
+  padding: 11px 13px;
+  border-radius: 16px;
   line-height: 1.5;
   font-size: 14px;
-  background: #fff;
-  color: #333;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+  background: rgba(255, 255, 255, 0.94);
+  color: var(--lm-text);
+  box-shadow: var(--lm-shadow-soft);
 }
 
 .message-row.user .message-bubble {
   color: #fff;
-  background: #ff6633;
+  background: linear-gradient(135deg, var(--lm-primary), #ff8f57);
+  border-bottom-right-radius: 6px;
+}
+
+.message-row.assistant .message-bubble {
+  border-bottom-left-radius: 6px;
+  box-shadow: var(--lm-shadow-soft), inset 3px 0 0 var(--lm-ai);
 }
 
 .recommend-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
   margin: 4px 0 14px;
 }
 
 .recommend-card {
   display: flex;
-  gap: 10px;
+  gap: 11px;
   padding: 10px;
-  background: #fff;
-  border-radius: 8px;
-  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.08);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(232, 251, 248, 0.66));
+  border: 1px solid rgba(21, 184, 166, 0.14);
+  border-radius: 18px;
+  box-shadow: var(--lm-shadow-soft);
   cursor: pointer;
 }
 
 .shop-cover {
   width: 86px;
   height: 86px;
-  border-radius: 6px;
+  border-radius: 14px;
   object-fit: cover;
   background: #eee;
   flex-shrink: 0;
+  box-shadow: 0 8px 18px rgba(36, 28, 24, 0.12);
 }
 
 .shop-info {
@@ -321,8 +335,8 @@ onMounted(() => {
 
 .shop-name {
   font-size: 15px;
-  font-weight: 700;
-  color: #222;
+  font-weight: 800;
+  color: var(--lm-text);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -331,9 +345,9 @@ onMounted(() => {
 .history-tag {
   flex-shrink: 0;
   padding: 2px 5px;
-  border-radius: 4px;
-  color: #ff6633;
-  background: #fff0e9;
+  border-radius: 999px;
+  color: var(--lm-primary);
+  background: var(--lm-primary-soft);
   font-size: 11px;
 }
 
@@ -343,12 +357,12 @@ onMounted(() => {
   gap: 8px;
   margin-top: 6px;
   font-size: 12px;
-  color: #666;
+  color: var(--lm-text-soft);
 }
 
 .shop-reason {
   margin-top: 6px;
-  color: #444;
+  color: var(--lm-text);
   font-size: 12px;
   line-height: 1.45;
 }
@@ -357,20 +371,22 @@ onMounted(() => {
   display: flex;
   gap: 8px;
   overflow-x: auto;
-  padding: 8px 12px;
-  background: #fff;
-  border-top: 1px solid #eee;
+  padding: 9px 12px;
+  background: rgba(255, 255, 255, 0.9);
+  border-top: 1px solid var(--lm-line);
+  backdrop-filter: blur(14px);
 }
 
 .prompt-chip {
   flex: 0 0 auto;
-  max-width: 220px;
-  padding: 7px 10px;
-  border: 1px solid #ffd2bf;
-  border-radius: 8px;
-  color: #ff6633;
-  background: #fff;
+  max-width: 240px;
+  padding: 8px 11px;
+  border: 1px solid rgba(255, 107, 53, 0.2);
+  border-radius: 999px;
+  color: var(--lm-primary-deep);
+  background: var(--lm-surface);
   font-size: 12px;
+  font-weight: 700;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -382,13 +398,16 @@ onMounted(() => {
   align-items: flex-end;
   gap: 8px;
   padding: 10px 12px 14px;
-  background: #fff;
+  background: rgba(255, 255, 255, 0.94);
+  border-top: 1px solid var(--lm-line);
+  box-shadow: 0 -10px 26px rgba(53, 35, 25, 0.06);
 }
 
 .send-btn {
   flex-shrink: 0;
   color: #fff;
-  background: #ff6633;
+  background: linear-gradient(135deg, var(--lm-primary), var(--lm-ai));
+  box-shadow: 0 10px 20px rgba(21, 184, 166, 0.18);
 }
 
 .send-btn:disabled {

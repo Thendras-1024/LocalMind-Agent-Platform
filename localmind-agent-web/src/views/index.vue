@@ -104,7 +104,7 @@ const toRecommendAgent = () => {
   <div class="search-bar">
     <div class="city-btn">杭州 <i class="el-icon-arrow-down"></i></div>
     <div class="search-input">
-      <el-input size="mini" placeholder="请输入商户名、地点">
+      <el-input size="small" placeholder="请输入商户名、地点">
         <template v-slot:prefix>
           <i class="el-input__icon el-icon-search"></i>
         </template>
@@ -164,13 +164,12 @@ const toRecommendAgent = () => {
     <span class="agent-face">
       <el-icon><ChatDotRound /></el-icon>
     </span>
-    <span class="agent-label">推荐小精灵</span>
+    <span class="agent-label">LocalMind 智慧精灵</span>
   </button>
   <FootBar :active-btn="1"></FootBar>
 </template>
 
 <style>
-@import '@/assets/css/main.css';
 @import '@/assets/css/index.css';
 .el-input__inner {
   border-radius: 20px;

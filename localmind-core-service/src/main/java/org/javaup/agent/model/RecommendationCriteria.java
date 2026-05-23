@@ -3,9 +3,13 @@ package org.javaup.agent.model;
 import lombok.Data;
 import lombok.experimental.Accessors;
 
+import java.io.Serializable;
+
 @Data
 @Accessors(chain = true)
-public class RecommendationCriteria {
+public class RecommendationCriteria implements Serializable {
+
+    private static final long serialVersionUID = 1L;
 
     private Long typeId;
 
@@ -17,9 +21,13 @@ public class RecommendationCriteria {
 
     private Long budgetMax;
 
+    private String budgetPreference;
+
     private Long perCapitaBudgetMin;
 
     private Long perCapitaBudgetMax;
+
+    private String distanceLevel;
 
     private Integer radiusMeters;
 

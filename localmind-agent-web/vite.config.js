@@ -55,6 +55,10 @@ export default defineConfig({
         target: apiProxyTarget,
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, '')
+      },
+      '/imgs': {
+        target: apiProxyTarget,
+        changeOrigin: true
       }
     }
   }

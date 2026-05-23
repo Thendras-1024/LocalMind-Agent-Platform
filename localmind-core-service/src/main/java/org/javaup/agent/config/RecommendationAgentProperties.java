@@ -4,20 +4,12 @@ import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 
-import java.math.BigDecimal;
-
 @Data
 @Component
-@ConfigurationProperties(prefix = "localmind.ai")
-public class LocalMindAiProperties {
+@ConfigurationProperties(prefix = "localmind.recommendation")
+public class RecommendationAgentProperties {
 
     private Boolean enabled = true;
-
-    private String baseUrl = "https://dashscope.aliyuncs.com/compatible-mode/v1";
-
-    private String apiKey = "";
-
-    private Integer timeoutMs = 5000;
 
     private Integer maxMessageChars = 500;
 
@@ -25,7 +17,7 @@ public class LocalMindAiProperties {
 
     private Integer maxCandidates = 20;
 
-    private Integer maxRecommendationSize = 5;
+    private Integer maxRecommendationSize = 3;
 
     private Integer maxContextChars = 6000;
 
@@ -33,33 +25,13 @@ public class LocalMindAiProperties {
 
     private Boolean fallbackEnabled = true;
 
-    private Boolean jsonSchemaEnabled = true;
+    private Boolean jsonSchemaEnabled = false;
 
-    private Chat chat = new Chat();
-
-    private Embedding embedding = new Embedding();
+    private Boolean ruleMatchingEnabled = false;
 
     private CircuitBreaker circuitBreaker = new CircuitBreaker();
 
     private RateLimit rateLimit = new RateLimit();
-
-    @Data
-    public static class Chat {
-
-        private String model = "qwen-plus";
-
-        private BigDecimal temperature = BigDecimal.valueOf(0.2);
-
-        private Integer maxTokens = 1200;
-    }
-
-    @Data
-    public static class Embedding {
-
-        private String model = "text-embedding-v4";
-
-        private Integer dimensions = 1024;
-    }
 
     @Data
     public static class CircuitBreaker {

@@ -80,6 +80,17 @@ public class ShopController {
        return shopService.queryShopByType(typeId, current, x, y);
     }
 
+    @GetMapping("/of/nearby")
+    public Result queryNearbyShops(
+            @RequestParam("typeId") Integer typeId,
+            @RequestParam(value = "current", defaultValue = "1") Integer current,
+            @RequestParam(value = "x", required = false) Double x,
+            @RequestParam(value = "y", required = false) Double y,
+            @RequestParam(value = "radius", required = false) Integer radius
+    ) {
+        return shopService.queryNearbyShops(typeId, current, x, y, radius);
+    }
+
     @GetMapping("/location/config")
     public Result queryLocationConfig() {
         return Result.ok(nearbyLocationProperties);
