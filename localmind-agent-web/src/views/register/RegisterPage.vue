@@ -48,7 +48,10 @@ const login = async () => {
   // 登录
   try {
     await formRef.value.validate()
-    const res = await userLogin(form.value)
+    const res = await userLogin({
+      phone: form.value.phone,
+      code: form.value.code
+    })
     console.log('注册成功token:', res.data)
     userStore.setToken(res.data)
     ElMessage.success('登录成功')

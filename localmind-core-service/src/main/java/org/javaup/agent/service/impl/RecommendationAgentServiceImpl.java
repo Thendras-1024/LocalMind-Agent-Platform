@@ -27,6 +27,7 @@ import org.javaup.agent.service.RecommendationContextBuilder;
 import org.javaup.agent.vo.RecommendationChatResponse;
 import org.javaup.agent.vo.RecommendationCriteriaVo;
 import org.javaup.agent.vo.RecommendationShopVo;
+import org.javaup.dto.UserDTO;
 import org.javaup.entity.Shop;
 import org.javaup.entity.ShopType;
 import org.javaup.service.IShopService;
@@ -76,6 +77,7 @@ public class RecommendationAgentServiceImpl implements IRecommendationAgentServi
     private static final int DEFAULT_RECOMMENDATION_SIZE = 3;
     private static final int DEFAULT_RADIUS_METERS = 5000;
     private static final int GEO_CANDIDATE_LIMIT = 200;
+    private static final long ANONYMOUS_USER_ID = 0L;
     private static final Set<Integer> ALLOWED_RADIUS_METERS = Set.of(3000, 5000, 10000);
     private static final Set<String> ALLOWED_SORTS = Set.of("compositeScore", "distance", "price");
 
@@ -148,7 +150,7 @@ public class RecommendationAgentServiceImpl implements IRecommendationAgentServi
     }
 
     private RecommendationChatResponse chatByGraph(RecommendationChatRequest request) {
-        Long userId = UserHolder.getUser().getId();
+        Long userId = currentUserId();
         String sessionId = normalizeSessionId(request.getSessionId());
         try {
             RecommendationWorkflowState state = recommendationGraph.invoke(new HashMap<>(Map.of(
@@ -173,6 +175,11 @@ public class RecommendationAgentServiceImpl implements IRecommendationAgentServi
             saveConversation(userId, sessionId, request, response);
             return response;
         }
+    }
+
+    private Long currentUserId() {
+        UserDTO user = UserHolder.getUser();
+        return user == null || user.getId() == null ? ANONYMOUS_USER_ID : user.getId();
     }
 
     private Map<String, Object> sessionMemoryNode(RecommendationWorkflowState state) {

@@ -386,3 +386,23 @@ Impacts recommendation Agent LLM invocation configuration. Spring AI now fully o
 - No custom Spring AI `@Value` reads remain in recommendation Agent source.
 - No manual temperature/max-token forwarding remains in the recommendation LLM client.
 - `mvn -pl localmind-core-service -am -DskipTests compile` passes.
+## Spring AI Numeric Serialization Isolation | 2026-05-23 16:18 | Keep DashScope request numeric fields valid
+### Affected Modules
+localmind-core-service/src/main/java/org/javaup/agent/config/SpringAiHttpClientConfig.java
+localmind-core-service/src/test/java/org/javaup/agent/config/SpringAiHttpClientConfigTest.java
+
+### Change Overview
+Fixed Spring AI outbound JSON serialization being affected by the project-wide Jackson `WRITE_NUMBERS_AS_STRINGS` setting. DashScope validates fields such as `temperature` and `dimensions` as numeric JSON values, so serializing them as strings can trigger errors like `temperature must be Float` or dimension format errors.
+
+### Core Modification Points
+- Added a Spring AI outbound HTTP ObjectMapper that disables `WRITE_NUMBERS_AS_STRINGS`.
+- Added a `RestClientCustomizer` to replace the Jackson converter used by outbound RestClient calls.
+- Kept global MVC/Jackson response behavior unchanged for frontend long-number compatibility.
+- Added a unit test verifying `temperature` and `dimensions` are serialized as JSON numbers, not strings.
+
+### Influence Scope
+Impacts Spring AI/DashScope outbound HTTP requests. Existing business API JSON serialization remains unchanged.
+
+### Verification Points
+- `mvn -pl localmind-core-service -am -DskipTests compile` passes.
+- `mvn -pl localmind-core-service '-Dtest=SpringAiHttpClientConfigTest,RecommendationContextBuilderTest' test` passes.

@@ -17,33 +17,34 @@
       <div
         v-for="item in messages"
         :key="item.id"
-        class="message-row"
-        :class="item.role"
+        class="message-block"
       >
-        <div class="message-bubble">
-          {{ item.content }}
+        <div class="message-row" :class="item.role">
+          <div class="message-bubble">
+            {{ item.content }}
+          </div>
         </div>
-      </div>
 
-      <div v-if="recommendations.length" class="recommend-list">
-        <div
-          v-for="shop in recommendations"
-          :key="shop.shopId"
-          class="recommend-card"
-          @click="toShopDetail(shop.shopId)"
-        >
-          <img :src="resolveAssetPath(shop.image)" alt="" class="shop-cover" />
-          <div class="shop-info">
-            <div class="shop-title-line">
-              <span class="shop-name">{{ shop.name }}</span>
-              <span v-if="shop.hasHistoryOrder" class="history-tag">去过</span>
+        <div v-if="item.recommendations?.length" class="recommend-list">
+          <div
+            v-for="shop in item.recommendations"
+            :key="shop.shopId"
+            class="recommend-card"
+            @click="toShopDetail(shop.shopId)"
+          >
+            <img :src="resolveAssetPath(shop.image)" alt="" class="shop-cover" />
+            <div class="shop-info">
+              <div class="shop-title-line">
+                <span class="shop-name">{{ shop.name }}</span>
+                <span v-if="shop.hasHistoryOrder" class="history-tag">去过</span>
+              </div>
+              <div class="shop-meta">
+                <span>{{ shop.score || '-' }}分</span>
+                <span>{{ formatDistance(shop.distance) }}</span>
+                <span>约{{ shop.estimatedTotalPrice || '-' }}元</span>
+              </div>
+              <div class="shop-reason">{{ shop.reason }}</div>
             </div>
-            <div class="shop-meta">
-              <span>{{ shop.score || '-' }}分</span>
-              <span>{{ formatDistance(shop.distance) }}</span>
-              <span>约{{ shop.estimatedTotalPrice || '-' }}元</span>
-            </div>
-            <div class="shop-reason">{{ shop.reason }}</div>
           </div>
         </div>
       </div>
@@ -81,35 +82,85 @@ import { nextTick, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ArrowLeft, Position, Promotion } from '@element-plus/icons-vue'
 import { sendRecommendationMessage } from '@/api/agent'
+import { getShopLocationConfig } from '@/api/shop'
 import { resolveAssetPath } from '@/utils/asset'
 
 const router = useRouter()
 const bodyRef = ref(null)
 const inputText = ref('')
 const loading = ref(false)
-const recommendations = ref([])
+const AGENT_STATE_KEY = 'recommendAgentState'
+const createWelcomeMessage = () => ({
+  id: Date.now(),
+  role: 'assistant',
+  content:
+    '你好，我是 LocalMind 智慧精灵。告诉我想去哪、几个人、预算、距离和时间，我来帮你筛店。'
+})
+function attachLegacyRecommendations(messages, recommendations) {
+  if (!recommendations.length || messages.some((message) => message.recommendations?.length)) return messages
+  const lastAssistantIndex = messages.findLastIndex((message) => message.role === 'assistant')
+  if (lastAssistantIndex < 0) return messages
+  return messages.map((message, index) =>
+    index === lastAssistantIndex ? { ...message, recommendations } : message
+  )
+}
+
+const persistedState = loadAgentState()
 const location = ref({ x: null, y: null })
 const locationText = ref('正在获取位置')
 const sessionId = ref(sessionStorage.getItem('recommendAgentSessionId') || '')
-const messages = ref([
-  {
-    id: Date.now(),
-    role: 'assistant',
-    content:
-      '你好，我是 LocalMind 智慧精灵。告诉我想去哪、几个人、预算、距离和时间，我来帮你筛店。'
-  }
-])
+const messages = ref(persistedState.messages)
 const quickPrompts = [
   '我和父母今天下午5点到8点想找5公里内评分高、总价150元以下的KTV',
   '两个人晚上想找近一点、评价好的美食店',
   '帮我找附近比较实惠的唱歌店'
 ]
 
+function loadAgentState() {
+  try {
+    const rawState = sessionStorage.getItem(AGENT_STATE_KEY)
+    const state = rawState ? JSON.parse(rawState) : {}
+    const messages =
+      Array.isArray(state.messages) && state.messages.length ? state.messages : [createWelcomeMessage()]
+    const recommendations = Array.isArray(state.recommendations) ? state.recommendations : []
+    return {
+      messages: attachLegacyRecommendations(messages, recommendations)
+    }
+  } catch (error) {
+    console.error(error)
+    return {
+      messages: [createWelcomeMessage()]
+    }
+  }
+}
+
+const persistAgentState = () => {
+  sessionStorage.setItem(
+    AGENT_STATE_KEY,
+    JSON.stringify({
+      messages: messages.value
+    })
+  )
+}
+
 const goBack = () => {
   router.back()
 }
 
-const locate = () => {
+const locate = async () => {
+  try {
+    const { data } = await getShopLocationConfig()
+    if (!data?.realCoordinateEnabled) {
+      location.value = {
+        x: data?.mockX,
+        y: data?.mockY
+      }
+      locationText.value = '已使用演示位置'
+      return
+    }
+  } catch (error) {
+    console.error(error)
+  }
   if (!navigator.geolocation) {
     locationText.value = '当前浏览器不支持定位'
     return
@@ -146,6 +197,7 @@ const sendMessage = async () => {
     role: 'user',
     content: text
   })
+  persistAgentState()
   inputText.value = ''
   loading.value = true
   await scrollToBottom()
@@ -160,12 +212,13 @@ const sendMessage = async () => {
       sessionId.value = data.sessionId
       sessionStorage.setItem('recommendAgentSessionId', data.sessionId)
     }
-    recommendations.value = data?.recommendations || []
     messages.value.push({
       id: Date.now() + 1,
       role: 'assistant',
-      content: data?.reply || '我暂时没有找到合适结果，可以换个条件再试试。'
+      content: data?.reply || '我暂时没有找到合适结果，可以换个条件再试试。',
+      recommendations: data?.recommendations || []
     })
+    persistAgentState()
   } catch (error) {
     console.error(error)
     messages.value.push({
@@ -173,6 +226,7 @@ const sendMessage = async () => {
       role: 'assistant',
       content: '导购服务暂时开小差了，稍后再试一次。'
     })
+    persistAgentState()
   } finally {
     loading.value = false
     await scrollToBottom()
@@ -198,6 +252,7 @@ const scrollToBottom = async () => {
 
 onMounted(() => {
   locate()
+  scrollToBottom()
 })
 </script>
 

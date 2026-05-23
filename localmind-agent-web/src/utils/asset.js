@@ -15,8 +15,9 @@ export function resolveAssetPath(path, fallback = '/imgs/icons/default-icon.png'
   const target = normalizeAssetPath(path || fallback)
   if (!target) return ''
   if (target.startsWith('http://') || target.startsWith('https://')) return target
+  if (assetMap[target]) return assetMap[target]
   const fallbackTarget = normalizeAssetPath(fallback)
-  return assetMap[target] || assetMap[fallbackTarget] || target
+  return isBundledAssetPath(target) ? assetMap[fallbackTarget] || target : target
 }
 
 function normalizeAssetPath(path) {
@@ -41,4 +42,8 @@ function normalizeAssetPath(path) {
   if (target.startsWith('imgs/')) return `/${target}`
   if (target.startsWith('/')) return target
   return `/${target}`
+}
+
+function isBundledAssetPath(path) {
+  return path.startsWith('/imgs/')
 }

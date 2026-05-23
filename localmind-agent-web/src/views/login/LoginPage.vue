@@ -21,7 +21,10 @@ const login = async () => {
   console.log('登录功能待实现')
   try {
     await formRef.value.validate()
-    const res = await userLogin(form.value)
+    const res = await userLogin({
+      phone: form.value.phone,
+      password: form.value.password
+    })
     console.log('登录成功:', res)
     console.log('登录成功token:', res.data)
     if (res.data) {

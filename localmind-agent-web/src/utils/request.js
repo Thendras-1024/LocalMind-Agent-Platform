@@ -47,6 +47,10 @@ instance.interceptors.response.use(
   },
   (error) => {
     if (error.response?.status === 401) {
+      if (error.config?.url?.startsWith('/agent/recommendation/')) {
+        ElMessage.error('智慧精灵服务暂时不可用，请稍后再试')
+        return Promise.reject(error)
+      }
       // TODO 4.未登录或者token过期 跳转到登录页
       ElMessage.error('响应拦截器提示：请先登录')
       router.push('/login')
