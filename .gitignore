@@ -84,6 +84,7 @@ nbdist/
 
 # Runtime uploaded files
 data/uploads/
+**/data/uploads/
 
 # Project-local assistant / scratch files
 .claude/

@@ -19,7 +19,20 @@
         :key="item.id"
         class="message-block"
       >
-        <div class="message-row" :class="item.role">
+        <div v-if="item.role === 'user' && item.content" class="message-row user">
+          <div class="message-bubble">
+            {{ item.content }}
+          </div>
+        </div>
+
+        <div v-if="item.role === 'assistant' && item.thinking" class="thinking-panel" :class="{ done: item.thinkingDone }">
+          <div class="thinking-title">
+            {{ item.thinkingDone ? '思考过程' : '正在思考' }}
+          </div>
+          <div class="thinking-content">{{ item.thinking }}</div>
+        </div>
+
+        <div v-if="item.role === 'assistant' && item.content" class="message-row assistant">
           <div class="message-bubble">
             {{ item.content }}
           </div>
@@ -45,6 +58,9 @@
               </div>
               <div class="shop-reason">{{ shop.reason }}</div>
             </div>
+          </div>
+          <div class="recommend-summary">
+            当前范围内检索到符合要求的店铺{{ item.matchedShopCount || item.recommendations.length }}家
           </div>
         </div>
       </div>
@@ -81,7 +97,7 @@
 import { nextTick, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ArrowLeft, Position, Promotion } from '@element-plus/icons-vue'
-import { sendRecommendationMessage } from '@/api/agent'
+import { streamRecommendationMessage } from '@/api/agent'
 import { getShopLocationConfig } from '@/api/shop'
 import { resolveAssetPath } from '@/utils/asset'
 
@@ -90,8 +106,24 @@ const bodyRef = ref(null)
 const inputText = ref('')
 const loading = ref(false)
 const AGENT_STATE_KEY = 'recommendAgentState'
+const DEFAULT_THINKING_TEXT = '正在分析需求...'
+const FALLBACK_THINKING_DONE_TEXT = '已完成需求分析，推荐结果如下。'
+const RAW_THINKING_PATTERNS = [
+  'here\'s a thinking process',
+  'analyzeuser input',
+  '**analyze',
+  'user input:',
+  'parents(',
+  'who:'
+]
+const TYPEWRITER_DELAY_MS = 18
+let messageIdSeed = Date.now()
+const createMessageId = () => {
+  messageIdSeed += 1
+  return messageIdSeed
+}
 const createWelcomeMessage = () => ({
-  id: Date.now(),
+  id: createMessageId(),
   role: 'assistant',
   content:
     '你好，我是 LocalMind 智慧精灵。告诉我想去哪、几个人、预算、距离和时间，我来帮你筛店。'
@@ -103,6 +135,41 @@ function attachLegacyRecommendations(messages, recommendations) {
   return messages.map((message, index) =>
     index === lastAssistantIndex ? { ...message, recommendations } : message
   )
+}
+
+function normalizePersistedMessages(messages) {
+  return messages.map((message) => {
+    if (message.role !== 'assistant' || !message.thinking) return message
+    const thinking = String(message.thinking)
+    const looksRaw = isRawThinkingText(thinking)
+    if (!looksRaw) return message
+    return {
+      ...message,
+      thinking: FALLBACK_THINKING_DONE_TEXT,
+      thinkingDone: true
+    }
+  })
+}
+
+function isRawThinkingText(text) {
+  const normalized = String(text || '').toLowerCase().replace(/\s+/g, '')
+  return RAW_THINKING_PATTERNS.some((pattern) => normalized.includes(pattern.replace(/\s+/g, '')))
+}
+
+function sanitizeThinkingText(text) {
+  return isRawThinkingText(text) ? '' : String(text || '')
+}
+
+const wait = (millis) => new Promise((resolve) => window.setTimeout(resolve, millis))
+
+async function appendTypewriter(target, field, chunk) {
+  const text = String(chunk || '')
+  for (const char of text) {
+    target[field] += char
+    persistAgentState()
+    await scrollToBottom()
+    await wait(TYPEWRITER_DELAY_MS)
+  }
 }
 
 const persistedState = loadAgentState()
@@ -124,7 +191,7 @@ function loadAgentState() {
       Array.isArray(state.messages) && state.messages.length ? state.messages : [createWelcomeMessage()]
     const recommendations = Array.isArray(state.recommendations) ? state.recommendations : []
     return {
-      messages: attachLegacyRecommendations(messages, recommendations)
+      messages: normalizePersistedMessages(attachLegacyRecommendations(messages, recommendations))
     }
   } catch (error) {
     console.error(error)
@@ -192,40 +259,116 @@ const usePrompt = (prompt) => {
 const sendMessage = async () => {
   const text = inputText.value.trim()
   if (!text || loading.value) return
+  const assistantMessage = {
+    id: createMessageId(),
+    role: 'assistant',
+    content: '',
+    thinking: DEFAULT_THINKING_TEXT,
+    thinkingDone: false,
+    recommendations: [],
+    matchedShopCount: 0
+  }
   messages.value.push({
-    id: Date.now(),
+    id: createMessageId(),
     role: 'user',
     content: text
   })
+  messages.value.push(assistantMessage)
   persistAgentState()
   inputText.value = ''
   loading.value = true
   await scrollToBottom()
   try {
-    const { data } = await sendRecommendationMessage({
-      sessionId: sessionId.value,
-      message: text,
-      x: location.value.x,
-      y: location.value.y
-    })
-    if (data?.sessionId) {
-      sessionId.value = data.sessionId
-      sessionStorage.setItem('recommendAgentSessionId', data.sessionId)
+    let streamError = ''
+    let reasoningBuffer = ''
+    let reasoningAccepted = false
+    await streamRecommendationMessage(
+      {
+        sessionId: sessionId.value,
+        message: text,
+        x: location.value.x,
+        y: location.value.y
+      },
+      {
+        reasoning_delta: async (chunk) => {
+          if (assistantMessage.thinking === DEFAULT_THINKING_TEXT) {
+            assistantMessage.thinking = ''
+          }
+          if (!reasoningAccepted) {
+            reasoningBuffer += String(chunk)
+            if (isRawThinkingText(reasoningBuffer)) {
+              assistantMessage.thinking = FALLBACK_THINKING_DONE_TEXT
+              assistantMessage.thinkingDone = true
+              persistAgentState()
+              return
+            }
+            if (reasoningBuffer.length < 24 && !/[。\n：:]/.test(reasoningBuffer)) {
+              return
+            }
+            reasoningAccepted = true
+            const safeText = sanitizeThinkingText(reasoningBuffer)
+            reasoningBuffer = ''
+            if (safeText) {
+              await appendTypewriter(assistantMessage, 'thinking', safeText)
+            }
+            return
+          }
+          const safeChunk = sanitizeThinkingText(chunk)
+          if (safeChunk) {
+            await appendTypewriter(assistantMessage, 'thinking', safeChunk)
+          }
+        },
+        reasoning_done: async () => {
+          if (!reasoningAccepted && reasoningBuffer) {
+            const safeText = sanitizeThinkingText(reasoningBuffer)
+            if (safeText) {
+              await appendTypewriter(assistantMessage, 'thinking', safeText)
+            }
+          }
+          if (!assistantMessage.thinking) {
+            assistantMessage.thinking = FALLBACK_THINKING_DONE_TEXT
+          }
+          assistantMessage.thinkingDone = true
+          persistAgentState()
+          await scrollToBottom()
+        },
+        reply_delta: async (chunk) => {
+          await appendTypewriter(assistantMessage, 'content', chunk)
+        },
+        final: async (data) => {
+          if (data?.sessionId) {
+            sessionId.value = data.sessionId
+            sessionStorage.setItem('recommendAgentSessionId', data.sessionId)
+          }
+          if (assistantMessage.thinking === DEFAULT_THINKING_TEXT) {
+            assistantMessage.thinking = FALLBACK_THINKING_DONE_TEXT
+          }
+          assistantMessage.thinkingDone = true
+          if (!assistantMessage.content) {
+            assistantMessage.content = data?.reply || '我暂时没有找到合适结果，可以换个条件再试试。'
+          }
+          assistantMessage.recommendations = data?.recommendations || []
+          assistantMessage.matchedShopCount = data?.matchedShopCount || assistantMessage.recommendations.length
+          persistAgentState()
+          await scrollToBottom()
+        },
+        error: (message) => {
+          streamError = String(message || 'stream error')
+        }
+      }
+    )
+    if (streamError) {
+      throw new Error(streamError)
     }
-    messages.value.push({
-      id: Date.now() + 1,
-      role: 'assistant',
-      content: data?.reply || '我暂时没有找到合适结果，可以换个条件再试试。',
-      recommendations: data?.recommendations || []
-    })
-    persistAgentState()
+    if (!assistantMessage.content) {
+      assistantMessage.content = '我暂时没有找到合适结果，可以换个条件再试试。'
+      assistantMessage.thinkingDone = true
+      persistAgentState()
+    }
   } catch (error) {
     console.error(error)
-    messages.value.push({
-      id: Date.now() + 2,
-      role: 'assistant',
-      content: '导购服务暂时开小差了，稍后再试一次。'
-    })
+    assistantMessage.content = '导购服务暂时开小差了，稍后再试一次。'
+    assistantMessage.thinkingDone = true
     persistAgentState()
   } finally {
     loading.value = false
@@ -349,6 +492,33 @@ onMounted(() => {
   box-shadow: var(--lm-shadow-soft), inset 3px 0 0 var(--lm-ai);
 }
 
+.thinking-panel {
+  margin: 0 0 12px;
+  padding: 11px 13px;
+  border: 1px solid rgba(21, 184, 166, 0.2);
+  border-radius: 16px;
+  background: rgba(232, 251, 248, 0.72);
+  box-shadow: var(--lm-shadow-soft);
+}
+
+.thinking-title {
+  font-size: 12px;
+  font-weight: 800;
+  color: #0f8f83;
+}
+
+.thinking-content {
+  margin-top: 6px;
+  white-space: pre-wrap;
+  color: var(--lm-text);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.thinking-panel.done {
+  background: rgba(255, 255, 255, 0.9);
+}
+
 .recommend-list {
   display: flex;
   flex-direction: column;
@@ -365,6 +535,14 @@ onMounted(() => {
   border-radius: 18px;
   box-shadow: var(--lm-shadow-soft);
   cursor: pointer;
+}
+
+.recommend-summary {
+  align-self: flex-end;
+  margin: -3px 4px 0 0;
+  color: var(--lm-muted);
+  font-size: 11px;
+  line-height: 1.4;
 }
 
 .shop-cover {

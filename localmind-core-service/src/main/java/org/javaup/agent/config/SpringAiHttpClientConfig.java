@@ -9,6 +9,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.converter.HttpMessageConverter;
 import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
 
@@ -28,7 +29,8 @@ public class SpringAiHttpClientConfig {
 
     @Bean
     @Order(Ordered.LOWEST_PRECEDENCE)
-    public RestClientCustomizer springAiNumberSafeRestClientCustomizer(ObjectMapper springAiHttpObjectMapper) {
+    public RestClientCustomizer springAiNumberSafeRestClientCustomizer(
+            @Qualifier("springAiHttpObjectMapper") ObjectMapper springAiHttpObjectMapper) {
         MappingJackson2HttpMessageConverter converter = new MappingJackson2HttpMessageConverter(springAiHttpObjectMapper);
         return builder -> builder.messageConverters(converters -> replaceJacksonConverter(converters, converter));
     }

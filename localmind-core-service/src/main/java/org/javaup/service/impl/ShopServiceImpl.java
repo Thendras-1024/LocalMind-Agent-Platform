@@ -311,7 +311,9 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
                     .eq("type_id", typeId)
                     .page(new Page<>(current, SystemConstants.DEFAULT_PAGE_SIZE));
             // 返回商铺列表
-            return Result.ok(page.getRecords());
+            Result<List<Shop>> result = Result.ok(page.getRecords());
+            result.setTotal(page.getTotal());
+            return result;
         }
 
         // ===== 有坐标模式：Redis GEO查询 =====
@@ -328,24 +330,28 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
                         RedisGeoCommands.GeoRadiusCommandArgs.newGeoRadiusArgs()
                                 .includeDistance()
                                 .sortAscending()
-                                .limit(end)
                 );
 
         // 2. 解析结果
         if (results == null) {
-            return Result.ok(Collections.emptyList());
+            Result<List<Shop>> result = Result.ok(Collections.emptyList());
+            result.setTotal(0L);
+            return result;
         }
         List<GeoResult<RedisGeoCommands.GeoLocation<String>>> list = results.getContent();
+        long total = list.size();
 
         // 没有更多数据了
         if (list.size() <= from) {
-            return Result.ok(Collections.emptyList());
+            Result<List<Shop>> result = Result.ok(Collections.emptyList());
+            result.setTotal(total);
+            return result;
         }
 
         // 3. 截取分页数据
         List<Long> ids = new ArrayList<>(list.size());
         Map<String, Distance> distanceMap = new HashMap<>(list.size());
-        list.stream().skip(from).forEach(result -> {
+        list.stream().skip(from).limit(SystemConstants.DEFAULT_PAGE_SIZE).forEach(result -> {
             // 获取商铺ID
             String shopIdStr = result.getContent().getName();
             ids.add(Long.valueOf(shopIdStr));
@@ -364,7 +370,9 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
         }
 
         // 6. 返回结果
-        return Result.ok(shops);
+        Result<List<Shop>> result = Result.ok(shops);
+        result.setTotal(total);
+        return result;
     }
 
     private int normalizeRadius(Integer radius) {

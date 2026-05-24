@@ -78,7 +78,9 @@ public class RecommendationPromptFactory {
                 }
                 约束:
                 - recommendations 最多 5 个。
-                - reason 不得超过 60 个中文字符。
+                - reply 使用自然导购口吻，先说明你按哪些真实条件筛选，再告诉用户推荐结果会在卡片中展示；不要机械复述字段名。
+                - reply 不得编造候选 JSON 之外的优惠、口味、环境、营业状态或适合人群。
+                - reason 控制在 45 到 80 个中文字符，必须引用候选数据里的评分、距离、预算或排序依据。
                 - 不要提及内部工具、JSON、上下文窗口、模型。
                 - 如无合适候选，recommendations 返回空数组，并在 reply 中建议放宽条件。
                 """;

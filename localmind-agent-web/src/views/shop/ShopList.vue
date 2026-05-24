@@ -74,12 +74,32 @@
           </div>
         </div>
       </div>
+      <div v-if="!loading && !shops.length" class="list-state">当前分类暂无店铺</div>
+      <div v-if="loading" class="list-state">正在加载...</div>
+      <div v-if="!loading && shops.length && isReachBottom" class="list-state">已经到底了</div>
+    </div>
+    <div class="pagination-bar">
+      <div
+        class="page-btn"
+        :class="{ disabled: loading || params.current <= 1 }"
+        @click="changePage(params.current - 1)"
+      >
+        上一页
+      </div>
+      <span class="page-info">第{{ params.current }}页 / 共{{ totalPages }}页</span>
+      <div
+        class="page-btn"
+        :class="{ disabled: loading || params.current >= totalPages }"
+        @click="changePage(params.current + 1)"
+      >
+        下一页
+      </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from 'vue'
+import { computed, ref, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ArrowLeft, ArrowDown, Search, Location } from '@element-plus/icons-vue'
 import { getShopList, getShopTypeList, getShopLocationConfig } from '@/api/shop'
@@ -93,7 +113,10 @@ const types = ref([])
 const shops = ref([])
 const typeName = ref('')
 const isReachBottom = ref(false)
+const loading = ref(false)
+const total = ref(0)
 let shopQueryToken = 0
+const PAGE_SIZE = 5
 const params = ref({
   typeId: 0,
   current: 1,
@@ -121,19 +144,29 @@ const queryTypes = async () => {
 const queryShops = async ({ reset = false } = {}) => {
   const token = ++shopQueryToken
   const requestParams = { ...params.value }
+  loading.value = true
   try {
-    const { data } = await getShopList(requestParams)
+    const result = await getShopList(requestParams)
     if (token !== shopQueryToken || requestParams.typeId !== params.value.typeId) {
       return
     }
+    const data = result.data
     if (!data) return
     data.forEach((s) => (s.images = s.images.split(',')[0]))
-    shops.value = reset || requestParams.current === 1 ? data : shops.value.concat(data)
+    shops.value = data
+    total.value = Number(result.total ?? data.length)
+    isReachBottom.value = params.value.current >= totalPages.value || data.length === 0
   } catch (error) {
     console.error(error)
     ElMessage.error('获取店铺列表失败')
+  } finally {
+    if (token === shopQueryToken) {
+      loading.value = false
+    }
   }
 }
+
+const totalPages = computed(() => Math.max(1, Math.ceil(total.value / PAGE_SIZE)))
 
 const resolveLocation = async () => {
   try {
@@ -204,6 +237,20 @@ const sortAndQuery = (sortBy) => {
   queryShops({ reset: true })
 }
 
+const changePage = (page) => {
+  if (loading.value) {
+    return
+  }
+  const nextPage = Math.min(Math.max(1, page), totalPages.value)
+  if (nextPage === params.value.current) {
+    return
+  }
+  params.value.current = nextPage
+  shops.value = []
+  isReachBottom.value = false
+  queryShops({ reset: true })
+}
+
 // 返回上一页
 const goBack = () => {
   router.replace('/index')
@@ -217,12 +264,9 @@ const toDetail = (id) => {
 // 滚动加载
 const onScroll = throttle((e) => {
   const { scrollTop, offsetHeight, scrollHeight } = e.target
-  if (scrollTop + offsetHeight + 1 > scrollHeight && !isReachBottom.value) {
-    isReachBottom.value = true
+  if (scrollTop + offsetHeight + 1 > scrollHeight && !isReachBottom.value && !loading.value) {
     params.value.current++
-    queryShops()
-  } else {
-    isReachBottom.value = false
+    queryShops({ reset: true })
   }
 }, 200)
 
@@ -231,6 +275,7 @@ const initData = async () => {
   shopQueryToken++
   params.value.typeId = Number(route.query.type) || 0
   shops.value = [] // 清空店铺列表
+  total.value = 0
   params.value.current = 1 // 重置页码
   await resolveLocation()
   await queryTypes()
@@ -322,7 +367,58 @@ onMounted(() => {
 .shop-list {
   flex: 1;
   overflow-y: auto;
-  padding: 12px;
+  padding: 12px 12px 76px;
+}
+
+.list-state {
+  padding: 12px 0 18px;
+  text-align: center;
+  color: var(--lm-muted);
+  font-size: 13px;
+}
+
+.pagination-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+  background: rgba(255, 255, 255, 0.94);
+  border-top: 1px solid var(--lm-line);
+}
+
+.page-btn {
+  min-width: 74px;
+  height: 34px;
+  border: 0;
+  border-radius: 999px;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  background: var(--lm-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.page-btn.disabled {
+  color: var(--lm-muted);
+  background: #f1ebe6;
+  cursor: not-allowed;
+}
+
+.page-info {
+  flex: 1;
+  text-align: center;
+  color: var(--lm-text-soft);
+  font-size: 13px;
+  font-weight: 700;
 }
 
 .shop-box {

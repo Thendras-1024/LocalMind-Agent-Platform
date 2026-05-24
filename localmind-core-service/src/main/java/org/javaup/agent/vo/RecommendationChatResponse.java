@@ -20,6 +20,8 @@ public class RecommendationChatResponse implements Serializable {
 
     private List<RecommendationShopVo> recommendations;
 
+    private Integer matchedShopCount;
+
     private Boolean needClarification;
 
     private List<String> missingFields;

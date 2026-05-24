@@ -30,6 +30,7 @@ public class MvcConfig implements WebMvcConfigurer {
                         "/upload/**",
                         "/blog/hot",
                         "/agent/recommendation/chat",
+                        "/agent/recommendation/chat/stream",
                         "/user/code",
                         "/user/login"
                 ).order(1);
