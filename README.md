@@ -38,16 +38,3 @@
 - `localmind-mq-framework`：消息队列生产者和消费者封装
 - `localmind-parameter`：业务参数对象
 
-## 启动说明
-
-后端主服务位于 `localmind-core-service`，前端应用位于 `localmind-agent-web`。
-
-```sh
-mvn -pl localmind-core-service -am package -DskipTests
-```
-
-```sh
-cd localmind-agent-web
-pnpm install
-pnpm dev
-```
